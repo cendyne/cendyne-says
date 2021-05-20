@@ -47,7 +47,7 @@ class CendyneSmol:
 
   def textToSticker(self, text):
 
-    style = FontStyle("Comic Mono", 300, emoji_svg="twemoji/assets/svg/")
+    style = FontStyle("Comic Mono", 300, emoji_svg="emojis/")
 
     an = objects.Animation(59)
     an.height = 1024

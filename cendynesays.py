@@ -2,6 +2,7 @@ import sys
 import os
 import math
 import hashlib
+import grapheme
 
 sys.path.insert(0, os.path.join(
   os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -39,15 +40,15 @@ class CendyneSays:
     for word in words:
       if len(word) > num:
         for i in range(0,len(word),num):
-          yield word[i:i+num]
+          yield grapheme.slice(word, start=i, end=i+num)
       else:
         yield word
 
-  def textToSticker(self, text):
-    text = text.replace("\n", "")
+  def textToSticker(self, input):
+    text = input.replace("\n", "")
     words = self.splitWords(text, 14)
 
-    style = FontStyle("DejaVu Sans", 180, emoji_svg="twemoji/assets/svg/")
+    style = FontStyle("DejaVu Sans", 180, emoji_svg="emojis/")
 
     textlayers = []
 
@@ -61,7 +62,7 @@ class CendyneSays:
         continue
       layer = objects.ShapeLayer()
       an.add_layer(layer)
-      print(word)
+      print("word: ", word)
       t = layer.add_shape(style.render(word))
 
       layer.add_shape(objects.Fill(Color(0, 0, 0)))
@@ -91,6 +92,10 @@ class CendyneSays:
         wordLineCount = 0
         unfit = False
         for index, tl in enumerate(textlayers, start=1):
+          bb = tl["bb"]
+          if bb is None:
+            # This text thing isn't real.
+            continue
           if x > MAX_X:
             # Move to the next line
             y += tl["lh"] * factor
@@ -98,7 +103,6 @@ class CendyneSays:
             wordLineCount = 0
           if wordLineCount > 0:
             x += factor * SPACE_W # TODO adjust
-          bb = tl["bb"]
           lh = tl["lh"] * factor
           pos = tl["l"].transform.position.value
           pos.x = x
@@ -137,7 +141,7 @@ class CendyneSays:
     an.add_layer(self.chatBubble.clone())
     an.add_layer(self.sticker.clone())
 
-    exporters.export_tgs(an, stickers.tempPath(text), True, False)
+    exporters.export_tgs(an, stickers.tempPath(input), True, False)
 
   # exporters.export_svg(an, "says.svg")
 
