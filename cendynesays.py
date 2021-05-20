@@ -87,7 +87,7 @@ class CendyneSays:
         line = 0
         x = START_X
         factor = 1 - (i * 0.0025)
-        print("Factor ", factor)
+        # print("Factor ", factor)
         wordLineCount = 0
         unfit = False
         for index, tl in enumerate(textlayers, start=1):
@@ -118,11 +118,11 @@ class CendyneSays:
             else:
               x += width
               wordLineCount += 1
-              print(tl["w"], " ", pos, " width ", width)
+              # print(tl["w"], " ", pos, " width ", width)
           else:
             x += width
             wordLineCount += 1
-            print(tl["w"], " ", pos, " width ", width)
+            # print(tl["w"], " ", pos, " width ", width)
           if y + lh > MAX_Y:
             unfit = True
             break

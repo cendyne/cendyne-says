@@ -18,11 +18,14 @@ from telegram.utils.helpers import escape_markdown
 from cendynesays import CendyneSays
 from cendynesmol import CendyneSmol
 import stickers
+from dotenv import load_dotenv
+
+load_dotenv()
 
 say = CendyneSays()
 smol = CendyneSmol()
 
-token = "1705790192:AAHSx64hF-cCgOIZon3hkezF9b9t63KxHGI"
+token = os.environ["BOT_TOKEN"]
 
 def makeSticker(text):
   if text == "":
@@ -58,7 +61,7 @@ def makeSticker(text):
 
   if not stickers.validSize(sticker):
     stickers.deleteSticker(sticker)
-    text = "OwO Desu: Your message was too long"
+    text = "OwO Desu: The sticker was too big for Telegram"
     keep = True
     sticker = say.makeSticker(text)
   return sticker, keep

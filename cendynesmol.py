@@ -17,7 +17,7 @@ from lottie.utils.animation import shake, rot_shake
 from lottie.utils import animation as anutils
 import stickers
 
-PARTICAL_COUNT = 40
+PARTICLE_COUNT = 40
 particle_start_single = Point(520, 280)
 particle_start = Point(380, 440)
 particle_scale = Point(50, 50)
@@ -94,7 +94,7 @@ class CendyneSmol:
         an.add_layer(self.stickerdash.clone())
         print("Set shake parameters")
       elif act == 3:
-        for i in range(0, PARTICAL_COUNT):
+        for i in range(0, PARTICLE_COUNT):
           layer = objects.ShapeLayer()
           an.insert_layer(0, layer)
           t = layer.add_shape(style.render(printtext))
@@ -105,7 +105,7 @@ class CendyneSmol:
           layer.transform.position.value = particle_start.clone()
           layer.transform.scale.value = particle_scale.clone()
 
-          t = i / PARTICAL_COUNT
+          t = i / PARTICLE_COUNT
           for thing in layer.shapes:
             if hasattr(thing,'opacity'):
               thing.opacity.add_keyframe(0, opacity_start + (opacity_end - opacity_start) * t)
