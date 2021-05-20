@@ -96,6 +96,7 @@ def inlinequery(update: Update, c: CallbackContext) -> None:
     if query == "":
       return
     
+    print(update)
     print(update.inline_query.from_user)
     sticker, keep = makeSticker(query)
 
