@@ -17,6 +17,7 @@ from telegram.utils.helpers import escape_markdown
 
 from cendynesays import CendyneSays
 from cendynesmol import CendyneSmol
+from cendynebreaths import CendyneBreathes
 import stickers
 from dotenv import load_dotenv
 
@@ -24,6 +25,7 @@ load_dotenv()
 
 say = CendyneSays()
 smol = CendyneSmol()
+breathes = CendyneBreathes()
 
 token = os.environ["BOT_TOKEN"]
 
@@ -44,11 +46,38 @@ def makeSticker(text):
   if len(text) > 120:
     text = "UwU Desu: Your message was too long"
   print("text ", text)
+
+  elements = list(grapheme.graphemes(text))
+
   try:
-    if grapheme.length(text) <= 3:
-      print("Smol sticker ", text)
-      sticker = smol.makeSticker(text)
-      # keep = True
+    le = len(elements)
+    if le <= 4:
+      if le == 3 and elements[0] == elements[1] and elements[1] == elements[2]:
+        for count in [40, 30, 20, 10, 5, 4, 3, 2, 1, 0]:
+          if count == 0:
+            sticker = say.makeSticker("Unsupported :(")
+            break
+          sticker = breathes.makeSticker(text, count)
+          if not stickers.validSize(sticker):
+            # Try a smaller particle size until the file is
+            # within Telegram's requirement
+            print("Count ", count, " resulted in too large of a file")
+            continue
+          break
+      else:
+        act = None
+        if elements[le - 1] == "!":
+          act = smol.actExclaim
+        elif elements[le - 1] == "?":
+          act = smol.actQuestion
+        elif le == 1:
+          act = smol.actNormal
+        if act is not None:
+          print("Smol sticker ", text)
+          sticker = smol.makeSticker(text, act)
+        else:
+          # Fallback to the normal text thing
+          sticker = say.makeSticker(text)
     else:
       sticker = say.makeSticker(text)
   except Exception as ex:
@@ -57,7 +86,6 @@ def makeSticker(text):
     text = ".-. An error"
     keep = True
     sticker = say.makeSticker(text)
-    
 
   if not stickers.validSize(sticker):
     stickers.deleteSticker(sticker)
