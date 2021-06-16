@@ -1,7 +1,5 @@
 import sys
 import os
-import math
-import hashlib
 import traceback
 import grapheme
 import emoji

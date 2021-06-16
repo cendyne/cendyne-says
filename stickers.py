@@ -15,5 +15,8 @@ def validSize(sticker):
 def tempPath(input):
   return './temp/' + hashlib.md5(input.encode('utf-8')).hexdigest() + '.tgs'
 
+def tempPathExt(input, ext):
+  return './temp/' + hashlib.md5(input.encode('utf-8')).hexdigest() + '.' + ext
+
 def stickerExists(input):
   return False
