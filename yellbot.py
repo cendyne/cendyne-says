@@ -25,9 +25,9 @@ yell = CendyneYells()
 def makeSticker(text):
   try:
     text = emoji.demojize(text, use_aliases=True)
-    print(text)
+    # print(text)
     text = emoji.emojize(text, use_aliases=True)
-    print(text.encode("raw_unicode_escape").decode("latin_1"))
+    # print(text.encode("raw_unicode_escape").decode("latin_1"))
   except Exception as ex:
     print(ex)
     pass
@@ -78,9 +78,20 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
           path = stickers.tempPathExt(update.message.sticker.file_id, "tgs")
           f.download(path)
           sticker = makeAnimatedSticker(path)
-          result = update.message.reply_sticker(sticker=open(sticker, "rb"))
-          c.bot.send_document(chat_id=-1001346187913, document=result.sticker.file_id)
-          print("Result:", result)
+          if stickers.validSize(sticker):
+            result = update.message.reply_sticker(sticker=open(sticker, "rb"))
+            c.bot.send_document(chat_id=-1001346187913, document=result.sticker.file_id)
+            print("Result:", result)
+          else:
+            # Delete the too big sticker
+            stickers.deleteSticker(sticker)
+            # Make a new one saying too big
+            sticker = makeSticker("File Size\nToo Big!")
+            result = update.message.reply_document(document=open(sticker, "rb"))
+            # No need to send it to the channel
+            # c.bot.send_document(chat_id=-1001346187913, document=result.sticker.file_id)
+            pass
+          
           stickers.deleteSticker(sticker)
           os.unlink(path)
         else:
