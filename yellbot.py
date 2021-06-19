@@ -27,6 +27,9 @@ review_chan = int(os.getenv("REVIEW_CHAN"))
 log_chan = int(os.getenv("LOG_CHAN"))
 admin = int(os.getenv("ADMIN"))
 
+max_width = 448
+max_height = 220
+
 yell = CendyneYells()
 
 def getConnection(_: CallbackContext) -> sqlite3.Connection:
@@ -194,8 +197,8 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
         f.download(path)
         print("got file ", f)
         img = Image.open(path)
-        wpercent = (448/float(img.size[0]))
-        hpercent = (192/float(img.size[1]))
+        wpercent = (max_width/float(img.size[0]))
+        hpercent = (max_height/float(img.size[1]))
         minpercent = min(wpercent, hpercent)
         hsize = int((float(img.size[1])*float(minpercent)))
         wsize = int((float(img.size[0])*float(minpercent)))
@@ -236,9 +239,12 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
           path = stickers.tempPathExt(update.message.sticker.file_id, "webp")
           f.download(path)
           img = Image.open(path)
-          wpercent = (256/float(img.size[0]))
-          hsize = int((float(img.size[1])*float(wpercent)))
-          resized = img.resize((256,hsize))
+          wpercent = (max_width/float(img.size[0]))
+          hpercent = (max_height/float(img.size[1]))
+          minpercent = min(wpercent, hpercent)
+          hsize = int((float(img.size[1])*float(minpercent)))
+          wsize = int((float(img.size[0])*float(minpercent)))
+          resized = img.resize((wsize,hsize))
           sticker = makeImageSticker(resized)
           result = update.message.reply_sticker(sticker=open(sticker, "rb"))
           c.bot.send_document(chat_id=log_chan, document=result.sticker.file_id)
@@ -247,6 +253,7 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
           os.unlink(path)
       elif update.message.document:
         doc = update.message.document
+        print("got document with mime type", doc.mime_type)
         if doc.mime_type == "image/png" or doc.mime_type == "image/jpeg":
           if doc.file_size > 2000000:
             update.message.reply_text("Too Big!")
@@ -255,8 +262,8 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
           path = stickers.tempPathExt(doc.file_id, "png")
           f.download(path)
           img = Image.open(path)
-          wpercent = (448/float(img.size[0]))
-          hpercent = (192/float(img.size[1]))
+          wpercent = (max_width/float(img.size[0]))
+          hpercent = (max_height/float(img.size[1]))
           minpercent = min(wpercent, hpercent)
           hsize = int((float(img.size[1])*float(minpercent)))
           wsize = int((float(img.size[0])*float(minpercent)))
