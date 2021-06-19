@@ -17,6 +17,7 @@ from cendyneyells import CendyneYells
 from PIL import Image
 import sqlite3
 import uuid
+import random
 
 load_dotenv()
 
@@ -296,7 +297,7 @@ def inlinequery(update: Update, c: CallbackContext) -> None:
       cursor = con.cursor()
       files = set()
       names = {}
-      for result in cursor.execute("select name, file_id from yell_learn where name like :name LIMIT 200", {
+      for result in cursor.execute("select name, file_id from yell_learn where name like :name order by random() LIMIT 200", {
         "name": "%" + query + "%"
       }):
         name = result[0]
@@ -317,6 +318,7 @@ def inlinequery(update: Update, c: CallbackContext) -> None:
             ))
     finally:
       con.close()
+    random.shuffle(results)
     update.inline_query.answer(results)
 
 
