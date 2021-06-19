@@ -28,6 +28,7 @@ review_chan = int(os.getenv("REVIEW_CHAN"))
 log_chan = int(os.getenv("LOG_CHAN"))
 admin = int(os.getenv("ADMIN"))
 no_results = os.getenv("NO_RESULTS")
+yell_tutorial = os.getenv("YELL_TUTORIAL")
 
 max_width = 448
 max_height = 220
@@ -57,7 +58,9 @@ def makeAnimatedSticker(file):
 def start(update: Update, _: CallbackContext) -> None:
     """Send a message when the command /start is issued."""
     print(update)
-    update.message.reply_text('Send a picture, a sticker, or some words. Later you can teach me about it with /learn')
+    update.message.reply_text('Send a picture, a sticker, or some words. Later you can teach me about it with /learn by replying to the sticker I make')
+    if yell_tutorial:
+      update.message.reply_animation(yell_tutorial)
 
 def callback(update: Update, c: CallbackContext) -> None:
   print(update)
