@@ -9,7 +9,7 @@ import logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-from telegram import InlineQueryResultArticle, ParseMode, InputTextMessageContent, Update, InlineQueryResultCachedSticker
+from telegram import Update, InlineQueryResultCachedSticker
 from telegram.ext import Updater, InlineQueryHandler, CommandHandler, CallbackContext, ChatMemberHandler, MessageHandler, Filters
 from telegram.utils.helpers import escape_markdown
 
@@ -25,7 +25,9 @@ say = CendyneSays()
 smol = CendyneSmol()
 breathes = CendyneBreathes()
 
+
 token = os.environ["BOT_TOKEN"]
+log_chan = int(os.getenv("LOG_CHAN"))
 
 def makeSticker(text):
   if text == "":
@@ -107,7 +109,7 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
       sticker, keep = makeSticker(text)
       print("About to reply with document ", sticker)
       # result = update.message.reply_document(document=open(sticker, "rb"))
-      result = c.bot.send_document(chat_id=-1001346187913, document=open(sticker, "rb"))
+      result = c.bot.send_document(chat_id=log_chan, document=open(sticker, "rb"))
       update.message.reply_document(document=result.sticker.file_id)
       print("Result:", result)
       if not keep:
@@ -129,7 +131,7 @@ def inlinequery(update: Update, c: CallbackContext) -> None:
     print(update.inline_query.from_user)
     sticker, keep = makeSticker(query)
 
-    result = c.bot.send_document(chat_id=-1001346187913, document=open(sticker, "rb"))
+    result = c.bot.send_document(chat_id=log_chan, document=open(sticker, "rb"))
     
     results = [
       InlineQueryResultCachedSticker(

@@ -1,17 +1,14 @@
-from sqlite3.dbapi2 import converters
-from typing import List
 from dotenv import load_dotenv
 
 import logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-from telegram import InlineQueryResultArticle, ParseMode, InputTextMessageContent, Update, InlineQueryResultCachedSticker, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update, InlineQueryResultCachedSticker, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Updater, InlineQueryHandler, CommandHandler, CallbackContext, ChatMemberHandler, MessageHandler, Filters, CallbackQueryHandler
 from telegram.utils.helpers import escape_markdown
 import collections
 import stickers
-import json
 import sys
 import os
 import traceback
@@ -24,11 +21,11 @@ import uuid
 load_dotenv()
 
 token = os.environ["YELL_TOKEN"]
-db = os.getenv("DB", ":memory:")
+db = os.getenv("DB")
 
-review_chan = -1001429865496
-log_chan = -1001346187913
-admin = 1687675990
+review_chan = int(os.getenv("REVIEW_CHAN"))
+log_chan = int(os.getenv("LOG_CHAN"))
+admin = int(os.getenv("ADMIN"))
 
 yell = CendyneYells()
 
