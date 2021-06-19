@@ -27,6 +27,7 @@ db = os.getenv("DB")
 review_chan = int(os.getenv("REVIEW_CHAN"))
 log_chan = int(os.getenv("LOG_CHAN"))
 admin = int(os.getenv("ADMIN"))
+no_results = os.getenv("NO_RESULTS")
 
 max_width = 448
 max_height = 220
@@ -319,6 +320,11 @@ def inlinequery(update: Update, c: CallbackContext) -> None:
     finally:
       con.close()
     random.shuffle(results)
+    if no_results and len(results) == 0:
+      results.append(InlineQueryResultCachedSticker(
+        id=uuid.uuid4(),
+        sticker_file_id=no_results,
+      ))
     update.inline_query.answer(results)
 
 
