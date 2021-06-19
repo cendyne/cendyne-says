@@ -7,3 +7,5 @@ twemoji
 temp
 .env
 .vscode
+*.sqlite
+*.sqlite3
