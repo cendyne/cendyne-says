@@ -45,8 +45,9 @@ def makeSticker(text):
     text = emoji.emojize(text, use_aliases=True)
     # print(text.encode("raw_unicode_escape").decode("latin_1"))
   except Exception as ex:
-    print(ex)
-    pass
+    # print(ex)
+    logging.exception("A problem during emjoi")
+    # pass
   return yell.makeSticker(text)
 
 def makeImageSticker(img):
@@ -57,17 +58,18 @@ def makeAnimatedSticker(file):
 
 def start(update: Update, _: CallbackContext) -> None:
     """Send a message when the command /start is issued."""
-    print(update)
+    # print(update)
+    logging.info("Help or Start")
     update.message.reply_text('Send a picture, a sticker, or some words. Later you can teach me about it with /learn by replying to the sticker I make')
     if yell_tutorial:
       update.message.reply_animation(yell_tutorial)
 
 def callback(update: Update, c: CallbackContext) -> None:
-  print(update)
+  logging.info("%s", str(update))
   data = update.callback_query.data
   args = data.split(" ", maxsplit=1)
   command = args[0]
-  print(args)
+  logging.info("args: %s", str(args))
   con = getConnection(c)
   chatId = None
   messageId = None
@@ -83,9 +85,11 @@ def callback(update: Update, c: CallbackContext) -> None:
         cursor.execute("delete from yell_pending where id = :id", {"id": args[1]})
         action = "delete"
         response = "Approved!"
-        print("Learned! ", name)
+        # print("Learned! ", name)
+        logging.info("Learned %s", name)
       else:
-        print("not found in db")
+        # print("not found in db")
+        logging.info("%s not found in db", name)
         action = "delete"
     elif command == "NO" and len(args) == 2:
       result = cursor.execute("select name, file_id, chat_id, message_id from yell_pending where id = :id", {"id": args[1]}).fetchone()
@@ -94,31 +98,38 @@ def callback(update: Update, c: CallbackContext) -> None:
         cursor.execute("delete from yell_pending where id = :id", {"id": args[1]})
         action = "delete"
         response = "Rejected! " + name + " will not be used"
-        print("rejected", name)
+        # print("rejected", name)
+        logging.info("Rejected %s",name)
       else:
-        print("not found in db")
+        # print("not found in db")
+        logging.info("%s not found in db", name)
         action = "delete"
     else:
-      print("Unsupported?", command, len(args))
+      # print("Unsupported?", command, len(args))
+      logging.info("Unsupported %s %n", command, len(args))
     con.commit()
   finally:
     con.close()
   if action == "delete":
     deleted = c.bot.delete_message(chat_id = update.callback_query.message.chat_id, message_id = update.callback_query.message.message_id)
-    print(deleted)
+    # print(deleted)
+    logging.info("Deleted response: %s", str(deleted))
   if response:
     send = c.bot.send_message(chat_id=chatId, text=response, reply_to_message_id=messageId)
-    print(send)
+    # print(send)
+    logging.info("Sent response: %s", str(send))
 
 
 
 def learn(update: Update, c: CallbackContext) -> None:
-    print(update)
+    # print(update)
+    logging.info("Learn update: %s", str(update))
     if not c.args or len(c.args) == 0:
       update.message.reply_text("Reply to a sticker with\n/learn name here\nto learn the name for that sticker")
       return
     name = (" ".join(c.args)).strip().lower()
-    print("Learn '", name, "'", sep="")
+    # print("Learn '", name, "'", sep="")
+    logging.info("Learn %s", str(name))
     if update.message.reply_to_message:
       msg = update.message.reply_to_message
       if msg.sticker:
@@ -173,7 +184,8 @@ def learn(update: Update, c: CallbackContext) -> None:
               [InlineKeyboardButton("\u274C " + fromUser, callback_data="NO " + id)]
             ]))
           update.message.reply_text("Submitting for approval")
-          print("review", sticker)
+          # print("review", sticker)
+          logging.info("Review %s", str(sticker))
         # elif msg.from_user.id == admin:
         #   pass
         else:
@@ -185,22 +197,26 @@ def learn(update: Update, c: CallbackContext) -> None:
 
 
 def messageHandler(update: Update, c: CallbackContext) -> None:
-  print("Message handler!!!", update)
+  # print("Message handler!!!", update)
+  logging.info("Message Update %s", str(update)) 
   try:
     if update.message:
       if update.message.text:
         sticker = makeSticker(update.message.text)
         result = update.message.reply_document(document=open(sticker, "rb"))
         c.bot.send_document(chat_id=log_chan, document=result.sticker.file_id)
-        print("Result:", result)
+        # print("Result:", result)
+        logging.info("Sent text sticker: %s", str(result))
         stickers.deleteSticker(sticker)
       elif update.message.photo:
-        print("Got image")
+        # print("Got image")
+        logging.info("Got image %s", str(update.message.photo))
         photo = update.message.photo[len(update.message.photo)-1]
         f = c.bot.get_file(photo.file_id)
         path = stickers.tempPathExt(photo.file_id, "jpg")
         f.download(path)
-        print("got file ", f)
+        # print("got file ", f)
+        logging.info("Got downloaded file %s", str(f))
         img = Image.open(path)
         wpercent = (max_width/float(img.size[0]))
         hpercent = (max_height/float(img.size[1]))
@@ -211,7 +227,8 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
         sticker = makeImageSticker(resized)
         result = update.message.reply_sticker(sticker=open(sticker, "rb"))
         c.bot.send_document(chat_id=log_chan, document=result.sticker.file_id)
-        print("Result:", result)
+        # print("Result:", result)
+        logging.info("Sent sticker %s", str(result))
         stickers.deleteSticker(sticker)
         os.unlink(path)
       elif update.message.sticker:
@@ -223,7 +240,8 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
           if stickers.validSize(sticker):
             result = update.message.reply_sticker(sticker=open(sticker, "rb"))
             c.bot.send_document(chat_id=log_chan, document=result.sticker.file_id)
-            print("Result:", result)
+            # print("Result:", result)
+            logging.info("Sent sticker %s", str(result))
           else:
             # Delete the too big sticker
             stickers.deleteSticker(sticker)
@@ -253,12 +271,14 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
           sticker = makeImageSticker(resized)
           result = update.message.reply_sticker(sticker=open(sticker, "rb"))
           c.bot.send_document(chat_id=log_chan, document=result.sticker.file_id)
-          print("Result:", result)
+          # print("Result:", result)
+          logging.info("Sent sticker %s", str(result))
           stickers.deleteSticker(sticker)
           os.unlink(path)
       elif update.message.document:
         doc = update.message.document
-        print("got document with mime type", doc.mime_type)
+        # print("got document with mime type", doc.mime_type)
+        logging.info("Received document %s", str(doc.mime_type))
         if doc.mime_type == "image/png" or doc.mime_type == "image/jpeg":
           if doc.file_size > 2000000:
             update.message.reply_text("Too Big!")
@@ -277,23 +297,27 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
           result = update.message.reply_sticker(sticker=open(sticker, "rb"))
           c.bot.send_document(chat_id=log_chan, document=result.sticker.file_id)
           print("Result:", result)
+          logging.info("Sent sticker %s", str(result))
           stickers.deleteSticker(sticker)
           os.unlink(path)
         else:
           update.message.reply_text("I can do PNGs and JPEGs but not this")
-          print("Mime type: ", doc.mime_type)
+          # print("Mime type: ", doc.mime_type)
+          logging.info("Mime type %s not supported", doc.mime_type)
       else:
         update.message.reply_text("unsupported")
         return
   except Exception as ex:
-      print("A problem I guess")
-      traceback.print_exception(*sys.exc_info())
+      # print("A problem I guess")
+      logging.exception("A problem I guess")
+      # traceback.print_exception(*sys.exc_info())
   
 
 def inlinequery(update: Update, c: CallbackContext) -> None:
     """Handle the inline query."""
     query = update.inline_query.query.lower()
-    print(update)
+    # print(update)
+    logging.info("Inline query %s", str(update))
     results = []
     con = getConnection(c)
     count = 0
@@ -315,7 +339,8 @@ def inlinequery(update: Update, c: CallbackContext) -> None:
         for file in names[name]:
           count = count+1
           if count < 50:
-            print(query, name, file)
+            # print(query, name, file)
+            logging.debug("Query result %s %s %s", query, name, file)
             results.append(InlineQueryResultCachedSticker(
               id=uuid.uuid4(),
               sticker_file_id=file,
