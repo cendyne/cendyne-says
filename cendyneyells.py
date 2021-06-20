@@ -29,7 +29,7 @@ class CendyneYells:
 
 
   def textToSticker(self, text):
-    style = FontStyle("Comic Mono", 300, emoji_svg="emojis/")
+    style = FontStyle("Roboto", 300, emoji_svg="emojis/")
 
     an = self.sticker.clone()
 
