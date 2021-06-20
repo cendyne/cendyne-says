@@ -9,3 +9,6 @@ temp
 .vscode
 *.sqlite
 *.sqlite3
+*.sock
+*.log
+*.pid
