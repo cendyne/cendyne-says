@@ -18,6 +18,7 @@ from PIL import Image
 import sqlite3
 import uuid
 import random
+import textwrap
 
 load_dotenv()
 
@@ -202,11 +203,21 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
   try:
     if update.message:
       if update.message.text:
-        sticker = makeSticker(update.message.text)
-        result = update.message.reply_document(document=open(sticker, "rb"))
-        c.bot.send_document(chat_id=log_chan, document=result.sticker.file_id)
+        if len(update.message.text) > 125:
+          logging.info("Too much text")
+          update.message.reply_text("Too much text, sorry")
+          return
+        text = "\n".join(textwrap.wrap(update.message.text, 25))
+        sticker = makeSticker(text)
+        if stickers.validSize(sticker):
+          result = update.message.reply_document(document=open(sticker, "rb"))
+          c.bot.send_document(chat_id=log_chan, document=result.sticker.file_id)
+          logging.info("Sent text sticker: %s", str(result))
+        else:
+          logging.info("Too much text")
+          update.message.reply_text("Too much text, sorry")
         # print("Result:", result)
-        logging.info("Sent text sticker: %s", str(result))
+        
         stickers.deleteSticker(sticker)
       elif update.message.photo:
         # print("Got image")
