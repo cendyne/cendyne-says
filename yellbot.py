@@ -60,7 +60,7 @@ def makeAnimatedSticker(file):
 def start(update: Update, _: CallbackContext) -> None:
     """Send a message when the command /start is issued."""
     # print(update)
-    logging.info("Help or Start")
+    logging.info("Help or Start %s", update)
     update.message.reply_text('Send a picture, a sticker, or some words. Later you can teach me about it with /learn by replying to the sticker I make')
     if yell_tutorial:
       update.message.reply_animation(yell_tutorial)
@@ -349,6 +349,7 @@ def inlinequery(update: Update, c: CallbackContext) -> None:
       for name in collections.OrderedDict(sorted(names.items())):
         for file in names[name]:
           count = count+1
+          # No more than 50 results are allowed
           if count < 50:
             # print(query, name, file)
             logging.debug("Query result %s %s %s", query, name, file)
@@ -359,12 +360,18 @@ def inlinequery(update: Update, c: CallbackContext) -> None:
     finally:
       con.close()
     random.shuffle(results)
+    switch_pm_text = None
+    switch_pm_parameter = None
     if no_results and len(results) == 0:
       results.append(InlineQueryResultCachedSticker(
         id=uuid.uuid4(),
         sticker_file_id=no_results,
       ))
-    update.inline_query.answer(results)
+      switch_pm_text = "Learn " + query[0:40]
+      # Todo figure out a switch_pm_parameter
+      # It only accepts 1-64 characters A-Za-z0-9\-_
+      switch_pm_parameter = "learn"
+    update.inline_query.answer(results, switch_pm_text=switch_pm_text, switch_pm_parameter=switch_pm_parameter)
 
 
 def initDb(con: sqlite3.Connection):
