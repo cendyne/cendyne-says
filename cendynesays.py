@@ -3,6 +3,7 @@ import os
 import math
 import hashlib
 import grapheme
+import logging
 
 sys.path.insert(0, os.path.join(
   os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -62,7 +63,8 @@ class CendyneSays:
         continue
       layer = objects.ShapeLayer()
       an.add_layer(layer)
-      print("word: ", word)
+      # print("word: ", word)
+      logging.info("Word %s", word)
       t = layer.add_shape(style.render(word))
 
       layer.add_shape(objects.Fill(Color(0, 0, 0)))

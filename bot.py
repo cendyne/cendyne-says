@@ -33,19 +33,21 @@ def makeSticker(text):
   if text == "":
     text = "Message Here"
   keep = False
-
+  oldtext = text
   try:
     text = emoji.demojize(text, use_aliases=True)
-    print(text)
+    # print(text)
     text = emoji.emojize(text, use_aliases=True)
-    print(text.encode("raw_unicode_escape").decode("latin_1"))
+    # print(text.encode("raw_unicode_escape").decode("latin_1"))
   except Exception as ex:
-    print(ex)
-    pass
+    # print(ex)
+    logging.exception("Error during emoji")
   
   if len(text) > 120:
     text = "UwU Desu: Your message was too long"
-  print("text ", text)
+  # print("text ", text)
+  if text != oldtext:
+    logging.info("Text converted to %s", text)
 
   elements = list(grapheme.graphemes(text))
 
@@ -61,7 +63,8 @@ def makeSticker(text):
           if not stickers.validSize(sticker):
             # Try a smaller particle size until the file is
             # within Telegram's requirement
-            print("Count ", count, " resulted in too large of a file")
+            # print("Count ", count, " resulted in too large of a file")
+            logging.info("Count %n result in too large of a file", count)
             continue
           break
       else:
@@ -73,7 +76,8 @@ def makeSticker(text):
         elif le == 1:
           act = smol.actNormal
         if act is not None:
-          print("Smol sticker ", text)
+          # print("Smol sticker ", text)
+          logging.info("Smol sticker %s", text)
           sticker = smol.makeSticker(text, act)
         else:
           # Fallback to the normal text thing
@@ -81,8 +85,9 @@ def makeSticker(text):
     else:
       sticker = say.makeSticker(text)
   except Exception as ex:
-    print("Exception ex", ex)
-    traceback.print_exception(*sys.exc_info())
+    # print("Exception ex", ex)
+    # traceback.print_exception(*sys.exc_info())
+    logging.exception("An error")
     text = ".-. An error"
     keep = True
     sticker = say.makeSticker(text)
@@ -96,27 +101,32 @@ def makeSticker(text):
 
 def start(update: Update, _: CallbackContext) -> None:
     """Send a message when the command /start is issued."""
-    print(update)
+    # print(update)
+    logging.info("Start issued")
     update.message.reply_text('Use @CendyneSaysBot text here to make a message')
 
 
 def messageHandler(update: Update, c: CallbackContext) -> None:
-  print("Message handler!!!", update)
+  # print("Message handler!!!", update)
+  logging.info("Incoming message %s", update)
   try:
     if update.message:
       text = update.message.text
       
       sticker, keep = makeSticker(text)
-      print("About to reply with document ", sticker)
+      # print("About to reply with document ", sticker)
+      logging.info("About to reply with sticker %s", sticker)
       # result = update.message.reply_document(document=open(sticker, "rb"))
       result = c.bot.send_document(chat_id=log_chan, document=open(sticker, "rb"))
       update.message.reply_document(document=result.sticker.file_id)
-      print("Result:", result)
+      # print("Result:", result)
+      logging.info("Sent sticker result %s", str(result))
       if not keep:
         stickers.deleteSticker(sticker)
   except Exception as ex:
-      print("A problem I guess")
-      traceback.print_exception(*sys.exc_info())
+      # print("A problem I guess")
+      # traceback.print_exception(*sys.exc_info())
+      logging.exception("A problem I guess")
   
 
 def inlinequery(update: Update, c: CallbackContext) -> None:
@@ -127,8 +137,9 @@ def inlinequery(update: Update, c: CallbackContext) -> None:
     if query == "":
       return
     
-    print(update)
-    print(update.inline_query.from_user)
+    # print(update)
+    # print(update.inline_query.from_user)
+    logging.info("Inline query %s", str(update))
     sticker, keep = makeSticker(query)
 
     result = c.bot.send_document(chat_id=log_chan, document=open(sticker, "rb"))

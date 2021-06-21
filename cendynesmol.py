@@ -69,7 +69,8 @@ class CendyneSmol:
       t.transform.position.value.y += t.line_height
       layer.transform.position.value = particle_start.clone()
       layer.transform.scale.value = particle_scale.clone()
-      print("Act ", act)
+      # print("Act ", act)
+      logging.debug("Act Variant %n", act)
       if act == 0:
         shake(layer.transform.position, 10, 15, 0, 59, 25)
       elif act == 1:
@@ -77,7 +78,8 @@ class CendyneSmol:
       elif act == 2:
         rot_shake(layer.transform.rotation, Point(-15, 15), 0, 60, 10)
       else:
-        print("No action detected")
+        logging.info("No action detected for %n", act)
+        # print("No action detected")
       an.add_layer(self.sticker.clone())
       an.add_layer(self.stickerdash.clone())
     exporters.export_tgs(an, stickers.tempPath(text), True, False)

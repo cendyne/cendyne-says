@@ -1,5 +1,6 @@
 import os
 import hashlib
+import logging
 
 def deleteSticker(sticker):
   if os.path.exists(sticker):
@@ -9,7 +10,8 @@ def validSize(sticker):
   if os.path.exists(sticker):
     return os.path.getsize(sticker) < 64000
   else:
-    print("ERROR no sticker could be exported")
+    logging.warn("No sticker could be exported, the file is missing")
+    # print("ERROR no sticker could be exported")
     return False
 
 def tempPath(input):
