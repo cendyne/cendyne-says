@@ -57,6 +57,9 @@ def makeImageSticker(img):
 def makeAnimatedSticker(file):
   return yell.makeStickerAnimated(file)
 
+def makeAnimatedStickerSvg(file):
+  return yell.makeStickerAnimatedSvg(file, max_width, max_height)
+
 def start(update: Update, _: CallbackContext) -> None:
     """Send a message when the command /start is issued."""
     # print(update)
@@ -146,7 +149,7 @@ def learn(update: Update, c: CallbackContext) -> None:
             update.message.reply_text("OK")
           finally:
             con.close()
-        elif msg.from_user.id == c.bot.id:
+        elif msg.from_user.id == c.bot.id or (msg.forward_from_chat and msg.forward_from_chat.id == log_chan):
           id = str(uuid.uuid4())
           con = getConnection(c)
           try:
@@ -243,6 +246,10 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
         stickers.deleteSticker(sticker)
         os.unlink(path)
       elif update.message.sticker:
+        if update.message.forward_from_chat and update.message.forward_from_chat.id == log_chan:
+          # Do nothing if the message is from the log
+          # This is for recovery relabeling
+          return
         if update.message.sticker.is_animated:
           f = c.bot.get_file(update.message.sticker.file_id) 
           path = stickers.tempPathExt(update.message.sticker.file_id, "tgs")
@@ -311,6 +318,22 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
           logging.info("Sent sticker %s", str(result))
           stickers.deleteSticker(sticker)
           os.unlink(path)
+        elif doc.mime_type == "image/svg+xml":
+          f = c.bot.get_file(doc.file_id) 
+          path = stickers.tempPathExt(doc.file_id, "png")
+          f.download(path)
+          sticker = makeAnimatedStickerSvg(path)
+          if stickers.validSize(sticker):
+            result = update.message.reply_document(document=open(sticker, "rb"))
+            c.bot.send_document(chat_id=log_chan, document=result.sticker.file_id)
+            logging.info("Sent text sticker: %s", str(result))
+          else:
+            logging.info("Could not fit image")
+            update.message.reply_text("SVG too complex could not import")
+          # print("Result:", result)
+          
+          stickers.deleteSticker(sticker)
+          os.unlink(path)
         else:
           update.message.reply_text("I can do PNGs and JPEGs but not this")
           # print("Mime type: ", doc.mime_type)
@@ -336,7 +359,7 @@ def inlinequery(update: Update, c: CallbackContext) -> None:
       cursor = con.cursor()
       files = set()
       names = {}
-      for result in cursor.execute("select name, file_id from yell_learn where name like :name order by random() LIMIT 200", {
+      for result in cursor.execute("select name, file_id from yell_learn where name like :name order by random()", {
         "name": "%" + query + "%"
       }):
         name = result[0]
@@ -362,11 +385,12 @@ def inlinequery(update: Update, c: CallbackContext) -> None:
     random.shuffle(results)
     switch_pm_text = None
     switch_pm_parameter = None
-    if no_results and len(results) == 0:
-      results.append(InlineQueryResultCachedSticker(
-        id=uuid.uuid4(),
-        sticker_file_id=no_results,
-      ))
+    if len(results) == 0:
+      if no_results:
+        results.append(InlineQueryResultCachedSticker(
+          id=uuid.uuid4(),
+          sticker_file_id=no_results,
+        ))
       switch_pm_text = "Learn " + query[0:40]
       # Todo figure out a switch_pm_parameter
       # It only accepts 1-64 characters A-Za-z0-9\-_

@@ -10,10 +10,13 @@ sys.path.insert(0, os.path.join(
 from lottie.utils import script
 from lottie import objects, exporters
 from lottie.parsers.tgs import parse_tgs
+from lottie.parsers.svg import parse_svg_file
+from lottie.utils.animation import spring_pull
 from lottie import Color, Point
 from lottie.utils.font import FontStyle
 import stickers
 from PIL import Image
+import logging
 
 particle_start = Point(10, 0)
 particle_scale = Point(50, 50)
@@ -64,6 +67,34 @@ class CendyneYells:
     sticker.save(path)
     return path
   
+  def animatedToStickerSvg(self, file, id, max_width, max_height):
+    an = self.sticker.clone()
+    svg = parse_svg_file(file).layers[0]
+    bb = objects.shapes.BoundingBox()
+    svg.out_point = an.out_point
+    for shape in svg.shapes:
+      bb.expand(shape.bounding_box())
+    l = an.add_layer(svg.clone())
+    
+    logging.debug("Bounding box %s", bb)
+
+    wpercent = float(max_width) / bb.width
+    hpercent = float(max_height)/ bb.height
+    minpercent = min(wpercent, hpercent)
+
+    l.transform.scale.value.x = minpercent * 100.0
+    l.transform.scale.value.y = minpercent * 100.0
+    l.transform.position.value.x = -1 * bb.x1 * minpercent
+    l.transform.position.value.y = -1 * bb.y1 * minpercent - (max_height / 4)
+
+    spring_pull(l.transform.position, Point(-1 * bb.x1 * minpercent, -1 * bb.y1 * minpercent + (max_height / 4)), 0, int(an.out_point * 0.5), 30, 7)
+    l.transform.position.add_keyframe(int(an.out_point * 0.8), Point(-1 * bb.x1 * minpercent, -1 * bb.y1 * minpercent - (max_height / 4)))
+
+    path = stickers.tempPath(id)
+    exporters.export_tgs(an, path, True, False)
+    return path
+
+
   def animatedToSticker(self, file, id):
     an = objects.Animation(self.sticker.out_point, self.sticker.frame_rate)
     yellUuid = str(uuid.uuid4())
@@ -121,3 +152,7 @@ class CendyneYells:
   def makeStickerAnimated(self, file):
     id = str(uuid.uuid4())
     return self.animatedToSticker(file, id)
+
+  def makeStickerAnimatedSvg(self, file, max_width, max_height):
+    id = str(uuid.uuid4())
+    return self.animatedToStickerSvg(file, id, max_width, max_height)
