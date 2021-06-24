@@ -14,7 +14,9 @@ from lottie import objects, exporters
 from lottie.parsers.svg import parse_svg_file
 from lottie import Color, Point
 from lottie.utils.font import FontStyle
+from lottie.objects import BoundingBox
 import stickers
+import shapes
 
 
 class CendyneSays:
@@ -26,15 +28,6 @@ class CendyneSays:
 
     self.sticker.transform.position.value.x = 85
     self.sticker.transform.position.value.y = 90
-
-    self.chatBubble = parse_svg_file(os.path.join(
-      os.path.dirname(os.path.abspath(__file__)),
-      "assets/chat-bubble.svg"
-    )).layers[0]
-
-    self.chatBubble.transform.position.value.y = -10
-    self.chatBubble.transform.scale.value.y = 100
-    self.chatBubble.transform.scale.value.x = 100
 
   def splitWords(self, text, num):
     words = text.split(" ")
@@ -77,6 +70,7 @@ class CendyneSays:
     max_w = 0
     max_h = 0
     y = 0
+    textbb = BoundingBox()
 
     if len(textlayers) > 0:
       START_X = 35
@@ -90,6 +84,7 @@ class CendyneSays:
         line = 0
         x = START_X
         factor = 1 - (i * 0.0025)
+        textbb = BoundingBox()
         # print("Factor ", factor)
         wordLineCount = 0
         unfit = False
@@ -109,6 +104,7 @@ class CendyneSays:
           pos = tl["l"].transform.position.value
           pos.x = x
           pos.y = y
+          textbb.include(x, y)
           scale = tl["l"].transform.scale.value
           scale.x = factor * 100
           scale.y = factor * 100
@@ -129,6 +125,7 @@ class CendyneSays:
             x += width
             wordLineCount += 1
             # print(tl["w"], " ", pos, " width ", width)
+          textbb.include(x, y + lh * 1.25)
           if y + lh > MAX_Y:
             unfit = True
             break
@@ -140,7 +137,13 @@ class CendyneSays:
         break
 
 
-    an.add_layer(self.chatBubble.clone())
+    textboxLayer = an.add_layer(objects.ShapeLayer())
+    logging.info("Bounding box for text %s", textbb)
+    textboxLayer.add_shape(shapes.TextBox(Point(textbb.x1 - 20, textbb.y1), textbb.size() + Point(60, 20), 40, Point(550, 400)))
+    fill = textboxLayer.add_shape(objects.Fill(Color(1, 1, 1)))
+    stroke = textboxLayer.add_shape(objects.Stroke(Color(0, 0, 0), 10))
+
+    # an.add_layer(self.chatBubble.clone())
     an.add_layer(self.sticker.clone())
 
     exporters.export_tgs(an, stickers.tempPath(input), True, False)
