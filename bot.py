@@ -177,7 +177,7 @@ def inlinequery(update: Update, c: CallbackContext) -> None:
     sticker, keep = makeSticker(query)
 
     result = c.bot.send_document(chat_id=log_chan, document=open(sticker, "rb"))
-    saysdb.cacheText(update.message.text, result.sticker.file_id)
+    saysdb.cacheText(query, result.sticker.file_id)
     
     results = [
       InlineQueryResultCachedSticker(
