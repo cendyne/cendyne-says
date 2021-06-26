@@ -15,10 +15,10 @@ import traceback
 import emoji
 from cendyneyells import CendyneYells
 from PIL import Image
-import sqlite3
 import uuid
 import random
 import textwrap
+import yelldb
 
 load_dotenv()
 
@@ -36,8 +36,6 @@ max_height = 220
 
 yell = CendyneYells()
 
-def getConnection(_: CallbackContext) -> sqlite3.Connection:
-  return sqlite3.connect(db)
 
 def makeSticker(text):
   try:
@@ -68,52 +66,50 @@ def start(update: Update, _: CallbackContext) -> None:
     if yell_tutorial:
       update.message.reply_animation(yell_tutorial)
 
+@yelldb.with_connection
 def callback(update: Update, c: CallbackContext) -> None:
   logging.info("%s", str(update))
   data = update.callback_query.data
   args = data.split(" ", maxsplit=1)
   command = args[0]
   logging.info("args: %s", str(args))
-  con = getConnection(c)
   chatId = None
   messageId = None
   action = None
   response = None
-  try:
-    cursor = con.cursor()
-    if command == "YES" and len(args) == 2:
-      result = cursor.execute("select name, file_id, chat_id, message_id from yell_pending where id = :id", {"id": args[1]}).fetchone()
-      if result:
-        (name, fileId, chatId, messageId) = result
-        cursor.execute("insert into yell_learn (name, file_id) values (:name, :file_id)", {"name": name, "file_id": fileId})
-        cursor.execute("delete from yell_pending where id = :id", {"id": args[1]})
-        action = "delete"
-        response = "Approved!"
-        # print("Learned! ", name)
-        logging.info("Learned %s", name)
-      else:
-        # print("not found in db")
-        logging.info("%s not found in db", name)
-        action = "delete"
-    elif command == "NO" and len(args) == 2:
-      result = cursor.execute("select name, file_id, chat_id, message_id from yell_pending where id = :id", {"id": args[1]}).fetchone()
-      if result:
-        (name, fileId, chatId, messageId) = result
-        cursor.execute("delete from yell_pending where id = :id", {"id": args[1]})
-        action = "delete"
-        response = "Rejected! " + name + " will not be used"
-        # print("rejected", name)
-        logging.info("Rejected %s",name)
-      else:
-        # print("not found in db")
-        logging.info("%s not found in db", name)
-        action = "delete"
+  if command == "YES" and len(args) == 2:
+    id = args[1]
+    result = yelldb.findPending(id)
+    if result:
+      (name, fileId, chatId, messageId) = result
+      yelldb.learn(name, fileId)
+      yelldb.deletePending(id)
+      action = "delete"
+      response = "Approved!"
+      # print("Learned! ", name)
+      logging.info("Learned %s", name)
     else:
-      # print("Unsupported?", command, len(args))
-      logging.info("Unsupported %s %n", command, len(args))
-    con.commit()
-  finally:
-    con.close()
+      # print("not found in db")
+      logging.info("%s not found in db", name)
+      action = "delete"
+  elif command == "NO" and len(args) == 2:
+    id = args[1]
+    result = yelldb.findPending(id)
+    if result:
+      (name, fileId, chatId, messageId) = result
+      yelldb.deletePending(id)
+      action = "delete"
+      response = "Rejected! " + name + " will not be used"
+      # print("rejected", name)
+      logging.info("Rejected %s",name)
+    else:
+      # print("not found in db")
+      logging.info("%s not found in db", name)
+      action = "delete"
+  else:
+    # print("Unsupported?", command, len(args))
+    logging.info("Unsupported %s %n", command, len(args))
+
   if action == "delete":
     deleted = c.bot.delete_message(chat_id = update.callback_query.message.chat_id, message_id = update.callback_query.message.message_id)
     # print(deleted)
@@ -125,6 +121,7 @@ def callback(update: Update, c: CallbackContext) -> None:
 
 
 
+@yelldb.with_connection
 def learn(update: Update, c: CallbackContext) -> None:
     # print(update)
     logging.info("Learn update: %s", str(update))
@@ -138,46 +135,17 @@ def learn(update: Update, c: CallbackContext) -> None:
       msg = update.message.reply_to_message
       if msg.sticker:
         if update.message.from_user and update.message.from_user.id == admin:
-          con = getConnection(c)
-          try:
-            cursor = con.cursor()
-            cursor.execute("insert into yell_learn(name, file_id) values (:name, :file_id)", {
-              "name": name,
-              "file_id": msg.sticker.file_id,
-            })
-            con.commit()
-            update.message.reply_text("OK")
-          finally:
-            con.close()
+          yelldb.learn(name, msg.sticker.file_id)
+          update.message.reply_text("OK")
         elif msg.from_user.id == c.bot.id or (msg.forward_from_chat and msg.forward_from_chat.id == log_chan):
+          if yelldb.countLearned(name, msg.sticker.file_id) > 0:
+            update.message.reply_text("I already know that!")
+            return
+          if yelldb.countPending(name, msg.sticker.file_id) > 0:
+            update.message.reply_text("Still waiting for review!")
+            return
           id = str(uuid.uuid4())
-          con = getConnection(c)
-          try:
-            cursor = con.cursor()
-            [result] = cursor.execute("select count(*) from yell_learn where name = :name and file_id = :file_id", {
-              "name": name,
-              "file_id": msg.sticker.file_id,
-            }).fetchone()
-            if result > 0:
-              update.message.reply_text("I already know that!")
-              return
-            [result] = cursor.execute("select count(*) from yell_pending where name = :name and file_id = :file_id", {
-              "name": name,
-              "file_id": msg.sticker.file_id,
-            }).fetchone()
-            if result > 0:
-              update.message.reply_text("Still waiting for review!")
-              return
-            cursor.execute("insert into yell_pending(id, name, file_id, chat_id, message_id) values (:id, :name, :file_id, :chat_id, :message_id)", {
-              "id": id,
-              "name": name,
-              "file_id": msg.sticker.file_id,
-              "chat_id": update.message.chat_id,
-              "message_id": update.message.message_id,
-            })
-            con.commit()
-          finally:
-            con.close()
+          yelldb.submit(id, name, msg.sticker.file_id, update.message.chat_id, update.message.message_id)
           fromUser = update.message.from_user and (update.message.from_user.username or update.message.from_user.first_name)
 
           sticker = c.bot.send_document(
@@ -210,15 +178,26 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
           logging.info("Too much text")
           update.message.reply_text("Too much text, sorry")
           return
+        cached = yelldb.cachedText(update.message.text)
+        if cached:
+          result = update.message.reply_document(document=cached)
+          logging.info("Sent text sticker: %s", str(result))
+          return
+        if yelldb.isTombstoned(update.message.text):
+          update.message.reply_text("Too much text, sorry")
+          return
         text = "\n".join(textwrap.wrap(update.message.text, 25))
         sticker = makeSticker(text)
         if stickers.validSize(sticker):
           result = update.message.reply_document(document=open(sticker, "rb"))
           c.bot.send_document(chat_id=log_chan, document=result.sticker.file_id)
           logging.info("Sent text sticker: %s", str(result))
+          yelldb.cacheText(update.message.text, result.sticker.file_id)
         else:
           logging.info("Too much text")
           update.message.reply_text("Too much text, sorry")
+          yelldb.tombstone(update.message.text)
+
         # print("Result:", result)
         
         stickers.deleteSticker(sticker)
@@ -226,6 +205,15 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
         # print("Got image")
         logging.info("Got image %s", str(update.message.photo))
         photo = update.message.photo[len(update.message.photo)-1]
+
+        if yelldb.isTombstoned(photo.file_id):
+          update.message.reply_text("Can't do it")
+          return
+        cached = yelldb.cachedFile(photo.file_unique_id)
+        if cached:
+          update.message.reply_document(document=cached)
+          return
+
         f = c.bot.get_file(photo.file_id)
         path = stickers.tempPathExt(photo.file_id, "jpg")
         f.download(path)
@@ -241,6 +229,7 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
         sticker = makeImageSticker(resized)
         result = update.message.reply_sticker(sticker=open(sticker, "rb"))
         c.bot.send_document(chat_id=log_chan, document=result.sticker.file_id)
+        yelldb.cacheFile(photo.file_unique_id, result.sticker.file_id)
         # print("Result:", result)
         logging.info("Sent sticker %s", str(result))
         stickers.deleteSticker(sticker)
@@ -249,6 +238,15 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
         if update.message.forward_from_chat and update.message.forward_from_chat.id == log_chan:
           # Do nothing if the message is from the log
           # This is for recovery relabeling
+          return
+        if yelldb.isTombstoned(update.message.sticker.file_unique_id):
+          logging.info("Sending tombstone")
+          update.message.reply_text("Can't do it")
+          return
+        cached = yelldb.cachedFile(update.message.sticker.file_unique_id)
+        if cached:
+          logging.info("Sending cached sticker")
+          update.message.reply_document(document=cached)
           return
         if update.message.sticker.is_animated:
           f = c.bot.get_file(update.message.sticker.file_id) 
@@ -260,15 +258,10 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
             c.bot.send_document(chat_id=log_chan, document=result.sticker.file_id)
             # print("Result:", result)
             logging.info("Sent sticker %s", str(result))
+            yelldb.cacheFile(update.message.sticker.file_unique_id, result.sticker.file_id)
           else:
-            # Delete the too big sticker
-            stickers.deleteSticker(sticker)
-            # Make a new one saying too big
-            sticker = makeSticker("File Size\nToo Big!")
-            result = update.message.reply_document(document=open(sticker, "rb"))
-            # No need to send it to the channel
-            # c.bot.send_document(chat_id=log_chan, document=result.sticker.file_id)
-            pass
+            update.message.reply_text("File Size too big")
+            yelldb.tombstone(update.message.sticker.file_unique_id)
           
           stickers.deleteSticker(sticker)
           os.unlink(path)
@@ -289,6 +282,7 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
           sticker = makeImageSticker(resized)
           result = update.message.reply_sticker(sticker=open(sticker, "rb"))
           c.bot.send_document(chat_id=log_chan, document=result.sticker.file_id)
+          yelldb.cacheFile(update.message.sticker.file_unique_id, result.sticker.file_id)
           # print("Result:", result)
           logging.info("Sent sticker %s", str(result))
           stickers.deleteSticker(sticker)
@@ -297,10 +291,21 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
         doc = update.message.document
         # print("got document with mime type", doc.mime_type)
         logging.info("Received document %s", str(doc.mime_type))
-        if doc.mime_type == "image/png" or doc.mime_type == "image/jpeg":
-          if doc.file_size > 2000000:
+        if doc.file_size > 2000000:
             update.message.reply_text("Too Big!")
+            # No need to tombstone it since we never download it.
             return
+        if yelldb.isTombstoned(doc.file_unique_id):
+          logging.info("Sending tombstone")
+          update.message.reply_text("Can't do it")
+          return
+        cached = yelldb.cachedFile(doc.file_unique_id)
+        if cached:
+          logging.info("Sending cached sticker")
+          update.message.reply_document(document=cached)
+          return
+
+        if doc.mime_type == "image/png" or doc.mime_type == "image/jpeg":
           f = c.bot.get_file(doc.file_id) 
           path = stickers.tempPathExt(doc.file_id, "png")
           f.download(path)
@@ -314,8 +319,8 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
           sticker = makeImageSticker(resized)
           result = update.message.reply_sticker(sticker=open(sticker, "rb"))
           c.bot.send_document(chat_id=log_chan, document=result.sticker.file_id)
-          print("Result:", result)
           logging.info("Sent sticker %s", str(result))
+          yelldb.cacheFile(doc.file_unique_id, result.sticker.file_id)
           stickers.deleteSticker(sticker)
           os.unlink(path)
         elif doc.mime_type == "image/svg+xml":
@@ -327,15 +332,17 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
             result = update.message.reply_document(document=open(sticker, "rb"))
             c.bot.send_document(chat_id=log_chan, document=result.sticker.file_id)
             logging.info("Sent text sticker: %s", str(result))
+            yelldb.cacheFile(doc.file_unique_id, result.sticker.file_id)
           else:
             logging.info("Could not fit image")
             update.message.reply_text("SVG too complex could not import")
+            yelldb.tombstone(doc.file_unique_id)
           # print("Result:", result)
           
           stickers.deleteSticker(sticker)
           os.unlink(path)
         else:
-          update.message.reply_text("I can do PNGs and JPEGs but not this")
+          update.message.reply_text("I can do PNGs and JPEGs, and SVGs but not this")
           # print("Mime type: ", doc.mime_type)
           logging.info("Mime type %s not supported", doc.mime_type)
       else:
@@ -346,42 +353,35 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
       logging.exception("A problem I guess")
       # traceback.print_exception(*sys.exc_info())
   
-
+@yelldb.with_connection
 def inlinequery(update: Update, c: CallbackContext) -> None:
     """Handle the inline query."""
     query = update.inline_query.query.lower()
     # print(update)
     logging.info("Inline query %s", str(update))
     results = []
-    con = getConnection(c)
     count = 0
-    try:
-      cursor = con.cursor()
-      files = set()
-      names = {}
-      for result in cursor.execute("select name, file_id from yell_learn where name like :name order by random()", {
-        "name": "%" + query + "%"
-      }):
-        name = result[0]
-        file_id = result[1]
-        if not file_id in files:
-          files.add(file_id)
-          l = names.get(name, [])
-          l.append(file_id)
-          names[name] = l
-      for name in collections.OrderedDict(sorted(names.items())):
-        for file in names[name]:
-          count = count+1
-          # No more than 50 results are allowed
-          if count < 50:
-            # print(query, name, file)
-            logging.debug("Query result %s %s %s", query, name, file)
-            results.append(InlineQueryResultCachedSticker(
-              id=uuid.uuid4(),
-              sticker_file_id=file,
-            ))
-    finally:
-      con.close()
+    files = set()
+    names = {}
+    for result in yelldb.findLearned(query):
+      name = result[0]
+      file_id = result[1]
+      if not file_id in files:
+        files.add(file_id)
+        l = names.get(name, [])
+        l.append(file_id)
+        names[name] = l
+    for name in collections.OrderedDict(sorted(names.items())):
+      for file in names[name]:
+        count = count+1
+        # No more than 50 results are allowed
+        if count < 50:
+          # print(query, name, file)
+          logging.debug("Query result %s %s %s", query, name, file)
+          results.append(InlineQueryResultCachedSticker(
+            id=uuid.uuid4(),
+            sticker_file_id=file,
+          ))
     random.shuffle(results)
     switch_pm_text = None
     switch_pm_parameter = None
@@ -398,18 +398,9 @@ def inlinequery(update: Update, c: CallbackContext) -> None:
     update.inline_query.answer(results, switch_pm_text=switch_pm_text, switch_pm_parameter=switch_pm_parameter)
 
 
-def initDb(con: sqlite3.Connection):
-  cur = con.cursor()
-  cur.execute("create table if not exists yell_cache (input_file_id, file_id)")
-  cur.execute("create table if not exists yell_learn (name, file_id)")
-  cur.execute("create table if not exists yell_pending (id, name, file_id, chat_id, message_id)")
-  cur.close()
-
 
 def main() -> None:
-  connection = sqlite3.connect(db)
-  initDb(connection)
-  connection.close()
+  yelldb.init()
   # Create the Updater and pass it your bot's token.
   updater = Updater(token)
 
