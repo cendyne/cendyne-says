@@ -54,7 +54,7 @@ def cacheText(input: Text, file_id: Text) -> bool:
 @with_cursor
 def findPending(id: Text) -> [Text, Text, int, int]:
  return localthreaddb.cur.execute("select name, file_id, chat_id, message_id from yell_pending where id = :id", {
-   "id": args[1]
+   "id": id
   }).fetchone()
 
 @with_cursor
@@ -73,7 +73,7 @@ def deletePending(id: Text):
 def learn(name: Text, file_id: Text):
   localthreaddb.cur.execute("insert into yell_learn (name, file_id) values (:name, :file_id)", {
     "name": name,
-    "file_id": fileId
+    "file_id": file_id
   })
 
 @with_cursor
