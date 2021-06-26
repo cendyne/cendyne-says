@@ -52,11 +52,7 @@ def with_cursor(func):
       localthreaddb.cur = cur
       try:
         return func(*args, **kwargs)
-      except Exception as e:
-        cur.rollback()
-        raise
       finally:
-        cur.close()
         # SQL in general can only have one cursor at a time.
         # Because we replaced it, it is not appropriate to restore it
         # as the cursro would not be valid

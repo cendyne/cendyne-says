@@ -1,5 +1,6 @@
 from typing import List, Text, Tuple
 from db import localthreaddb, with_cursor, with_connection
+import logging
 
 @with_cursor
 def isTombstoned(input: Text) -> bool:
@@ -87,7 +88,7 @@ def countLearned(name: Text, file_id: Text) -> int:
 def findLearned(query: Text) -> List[Tuple[Text, Text]]:
   cursor = localthreaddb.cur
   sql = "select name, file_id from yell_learn where name like :name order by random()"
-  name = ""
+  name = "%"
   counter = 0
   for part in query.split():
     part = part.strip()
@@ -96,9 +97,11 @@ def findLearned(query: Text) -> List[Tuple[Text, Text]]:
         name += "%"
       counter += 1
       name += part
+  name += "%"
   if counter == 0:
     return cursor.execute("select name, file_id from yell_learn order by random()")
   else:
+    logging.info("Searching for %s",name)
     return cursor.execute(sql, {"name": name})
 
 @with_cursor
