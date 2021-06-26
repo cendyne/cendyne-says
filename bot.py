@@ -18,6 +18,8 @@ from cendynesmol import CendyneSmol
 from cendynebreaths import CendyneBreathes
 import stickers
 from dotenv import load_dotenv
+from saysdb import with_connection
+import saysdb
 
 load_dotenv()
 
@@ -99,19 +101,30 @@ def makeSticker(text):
     sticker = say.makeSticker(text)
   return sticker, keep
 
+@with_connection
 def start(update: Update, _: CallbackContext) -> None:
-    """Send a message when the command /start is issued."""
-    # print(update)
-    logging.info("Start issued")
-    update.message.reply_text('Use @CendyneSaysBot text here to make a message')
+  """Send a message when the command /start is issued."""
+  # print(update)
+  logging.info("Start issued")
+  update.message.reply_text('Use @CendyneSaysBot text here to make a message')
 
-
+@with_connection
 def messageHandler(update: Update, c: CallbackContext) -> None:
   # print("Message handler!!!", update)
   logging.info("Incoming message %s", update)
   try:
     if update.message:
       text = update.message.text
+
+      if saysdb.isTombstoned(update.message.text):
+        update.message.reply_text("An error")
+        return
+
+      cached = saysdb.cachedText(update.message.text)
+      if cached:
+        logging.info("Using cached result")
+        update.message.reply_document(document=cached)
+        return
       
       sticker, keep = makeSticker(text)
       # print("About to reply with document ", sticker)
@@ -119,30 +132,52 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
       # result = update.message.reply_document(document=open(sticker, "rb"))
       result = c.bot.send_document(chat_id=log_chan, document=open(sticker, "rb"))
       update.message.reply_document(document=result.sticker.file_id)
+      saysdb.cacheText(update.message.text, result.sticker.file_id)
       # print("Result:", result)
       logging.info("Sent sticker result %s", str(result))
       if not keep:
         stickers.deleteSticker(sticker)
   except Exception as ex:
-      # print("A problem I guess")
-      # traceback.print_exception(*sys.exc_info())
-      logging.exception("A problem I guess")
+    # print("A problem I guess")
+    # traceback.print_exception(*sys.exc_info())
+    logging.exception("A problem I guess")
+    saysdb.tombstone(update.message.text)
   
-
+@with_connection
 def inlinequery(update: Update, c: CallbackContext) -> None:
-    """Handle the inline query."""
-    query = update.inline_query.query
-    keep = False
+  """Handle the inline query."""
+  query = update.inline_query.query
+  keep = False
 
-    if query == "":
-      return
-    
-    # print(update)
-    # print(update.inline_query.from_user)
-    logging.info("Inline query %s", str(update))
+  if query == "":
+    return
+  
+  # print(update)
+  # print(update.inline_query.from_user)
+  logging.info("Inline query %s", str(update))
+
+  if saysdb.isTombstoned(query):
+    update.inline_query.answer([])
+    return
+
+  cached = saysdb.cachedText(query)
+  if cached:
+    logging.info("Using cached result")
+    results = [
+      InlineQueryResultCachedSticker(
+        id=uuid.uuid4(),
+        sticker_file_id=cached,
+      ),
+    ]
+
+    update.inline_query.answer(results)
+    return
+  
+  try:
     sticker, keep = makeSticker(query)
 
     result = c.bot.send_document(chat_id=log_chan, document=open(sticker, "rb"))
+    saysdb.cacheText(update.message.text, result.sticker.file_id)
     
     results = [
       InlineQueryResultCachedSticker(
@@ -155,32 +190,38 @@ def inlinequery(update: Update, c: CallbackContext) -> None:
 
     if not keep:
       stickers.deleteSticker(sticker)
+  except Exception as ex:
+    # print("A problem I guess")
+    # traceback.print_exception(*sys.exc_info())
+    logging.exception("A problem I guess")
+    saysdb.tombstone(query)
 
 
 def main() -> None:
-    # Create the Updater and pass it your bot's token.
-    updater = Updater(token)
+  saysdb.init()
+  # Create the Updater and pass it your bot's token.
+  updater = Updater(token)
 
-    # Get the dispatcher to register handlers
-    dispatcher = updater.dispatcher
+  # Get the dispatcher to register handlers
+  dispatcher = updater.dispatcher
 
-    # on different commands - answer in Telegram
-    dispatcher.add_handler(CommandHandler("start", start))
+  # on different commands - answer in Telegram
+  dispatcher.add_handler(CommandHandler("start", start))
 
-    # on non command i.e message - echo the message on Telegram
-    dispatcher.add_handler(InlineQueryHandler(inlinequery))
-    dispatcher.add_handler(ChatMemberHandler(messageHandler))
-    dispatcher.add_handler(MessageHandler(Filters.text, messageHandler))
+  # on non command i.e message - echo the message on Telegram
+  dispatcher.add_handler(InlineQueryHandler(inlinequery))
+  dispatcher.add_handler(ChatMemberHandler(messageHandler))
+  dispatcher.add_handler(MessageHandler(Filters.text, messageHandler))
 
-    # Start the Bot
-    updater.start_polling()
+  # Start the Bot
+  updater.start_polling()
 
-    # Block until the user presses Ctrl-C or the process receives SIGINT,
-    # SIGTERM or SIGABRT. This should be used most of the time, since
-    # start_polling() is non-blocking and will stop the bot gracefully.
-    updater.idle()
+  # Block until the user presses Ctrl-C or the process receives SIGINT,
+  # SIGTERM or SIGABRT. This should be used most of the time, since
+  # start_polling() is non-blocking and will stop the bot gracefully.
+  updater.idle()
 
 
 if __name__ == '__main__':
-    main()
+  main()
 
