@@ -4,7 +4,7 @@ import logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-from telegram import Update, InlineQueryResultCachedSticker, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update, Message, InlineQueryResultCachedSticker, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Updater, InlineQueryHandler, CommandHandler, CallbackContext, ChatMemberHandler, MessageHandler, Filters, CallbackQueryHandler
 from telegram.utils.helpers import escape_markdown
 import collections
@@ -19,6 +19,7 @@ import uuid
 import random
 import textwrap
 import yelldb
+from typing import Text
 
 load_dotenv()
 
@@ -65,6 +66,20 @@ def start(update: Update, _: CallbackContext) -> None:
     update.message.reply_text('Send a picture, a sticker, or some words. Later you can teach me about it with /learn by replying to the sticker I make')
     if yell_tutorial:
       update.message.reply_animation(yell_tutorial)
+
+@yelldb.with_connection
+def cancel(update: Update, _: CallbackContext) -> None:
+    """Send a message when the command /start is issued."""
+    # print(update)
+    logging.info("Cancel %s", update)
+    update.message.reply_text("Alrighty")
+    state = yelldb.chatState(update.message.chat_id)
+    state.file_id = None
+    state.message_id = None
+    state.learning = False
+    state.input = None
+    yelldb.saveChatState(state)
+
 
 @yelldb.with_connection
 def callback(update: Update, c: CallbackContext) -> None:
@@ -119,14 +134,69 @@ def callback(update: Update, c: CallbackContext) -> None:
     # print(send)
     logging.info("Sent response: %s", str(send))
 
+def clearState(state: yelldb.ChatState):
+  state.file_id = None
+  state.input = None
+  state.learning = False
+  state.message_id = None
+  yelldb.saveChatState(state)
+
+def submitForReview(update: Update, c: CallbackContext, state: yelldb.ChatState):
+  if yelldb.countLearned(state.input, state.file_id) > 0:
+      update.message.reply_text("I already know that!")
+      clearState(state)
+      return
+  if update.message.from_user and update.message.from_user.id == admin:
+    yelldb.learn(state.input, state.file_id)
+    update.message.reply_text("OK")
+    clearState(state)
+    return
+  elif state.file_id:
+    if yelldb.countPending(state.input, state.file_id) > 0:
+      update.message.reply_text("Still waiting for review!")
+      clearState(state)
+      return
+
+    id = str(uuid.uuid4())
+    yelldb.submit(id, state.input, state.file_id, update.message.chat_id, update.message.message_id)
+    fromUser = update.message.from_user and (update.message.from_user.username or update.message.from_user.first_name)
+
+    sticker = c.bot.send_document(
+      chat_id=review_chan,
+      document=state.file_id,
+      reply_markup=InlineKeyboardMarkup([
+        [InlineKeyboardButton(state.input, callback_data="YES " + id)],
+        [InlineKeyboardButton("\u274C " + fromUser, callback_data="NO " + id)]
+      ]))
+    update.message.reply_text("Submitting for approval")
+
+    clearState(state)
+  else:
+    update.message.reply_text("Something's not right!")
 
 
 @yelldb.with_connection
 def learn(update: Update, c: CallbackContext) -> None:
     # print(update)
     logging.info("Learn update: %s", str(update))
+    state = yelldb.chatState(update.message.chat_id)
     if not c.args or len(c.args) == 0:
-      update.message.reply_text("Reply to a sticker with\n/learn name here\nto learn the name for that sticker")
+      if update.message.reply_to_message and update.message.reply_to_message.sticker:
+        msg = update.message.reply_to_message
+        if msg.from_user.id == c.bot.id or (msg.forward_from_chat and msg.forward_from_chat.id == log_chan):
+          state.file_id = msg.sticker.file_id
+          state.message_id = msg.message_id
+          update.message.reply_text("Reply with the label you want for this message", reply_to_message_id = state.message_id)
+          state.learning = True
+          yelldb.saveChatState(state)
+        else:
+          update.message.reply_text("If you use /learn, it should be against a sticker I sent!")
+      elif state.file_id:
+        update.message.reply_text("Reply with the label you want for this message", reply_to_message_id = state.message_id)
+        state.learning = True
+        yelldb.saveChatState(state)
+      else:
+        update.message.reply_text("Reply to a sticker I've made with /learn or create a new one by sending me text, a sticker, a photo, or a picture file")
       return
     name = (" ".join(c.args)).strip().lower()
     # print("Learn '", name, "'", sep="")
@@ -134,46 +204,36 @@ def learn(update: Update, c: CallbackContext) -> None:
     if update.message.reply_to_message:
       msg = update.message.reply_to_message
       if msg.sticker:
-        if update.message.from_user and update.message.from_user.id == admin:
-          yelldb.learn(name, msg.sticker.file_id)
-          update.message.reply_text("OK")
-        elif msg.from_user.id == c.bot.id or (msg.forward_from_chat and msg.forward_from_chat.id == log_chan):
-          if yelldb.countLearned(name, msg.sticker.file_id) > 0:
-            update.message.reply_text("I already know that!")
-            return
-          if yelldb.countPending(name, msg.sticker.file_id) > 0:
-            update.message.reply_text("Still waiting for review!")
-            return
-          id = str(uuid.uuid4())
-          yelldb.submit(id, name, msg.sticker.file_id, update.message.chat_id, update.message.message_id)
-          fromUser = update.message.from_user and (update.message.from_user.username or update.message.from_user.first_name)
-
-          sticker = c.bot.send_document(
-            chat_id=review_chan,
-            document=msg.sticker.file_id,
-            reply_markup=InlineKeyboardMarkup([
-              [InlineKeyboardButton(name, callback_data="YES " + id)],
-              [InlineKeyboardButton("\u274C " + fromUser, callback_data="NO " + id)]
-            ]))
-          update.message.reply_text("Submitting for approval")
-          # print("review", sticker)
-          logging.info("Review %s", str(sticker))
-        # elif msg.from_user.id == admin:
-        #   pass
+        state.input = name
+        if msg.from_user.id == c.bot.id or (msg.forward_from_chat and msg.forward_from_chat.id == log_chan):
+          state.file_id = msg.sticker.file_id
+          state.message_id = msg.message_id
+          submitForReview(update, c, state)
         else:
-          update.message.reply_text("I didn't send that!")
+          update.message.reply_text("I didn't make that sticker!")
       else:
         update.message.reply_text("That's not a sticker!")
+    elif state.file_id:
+      state.input = name
+      submitForReview(update, c, state)
     else:
       update.message.reply_text('Reply to which sticker (from me) you want me to learn')
 
 
 def messageHandler(update: Update, c: CallbackContext) -> None:
   # print("Message handler!!!", update)
-  logging.info("Message Update %s", str(update)) 
+  logging.info("Message Update %s", str(update))
+  
   try:
     if update.message:
+      state = yelldb.chatState(update.message.chat_id)
       if update.message.text:
+        if state.learning:
+          logging.info("Learning state active")
+          state.input = update.message.text
+          submitForReview(update, c, state)
+          return
+        # Generate a sticker
         if len(update.message.text) > 125:
           logging.info("Too much text")
           update.message.reply_text("Too much text, sorry")
@@ -181,6 +241,10 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
         cached = yelldb.cachedText(update.message.text)
         if cached:
           result = update.message.reply_document(document=cached)
+          state.input = update.message.text
+          state.file_id = cached
+          state.message_id = result.message_id
+          yelldb.saveChatState(state)
           logging.info("Sent text sticker: %s", str(result))
           return
         if yelldb.isTombstoned(update.message.text):
@@ -193,6 +257,10 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
           c.bot.send_document(chat_id=log_chan, document=result.sticker.file_id)
           logging.info("Sent text sticker: %s", str(result))
           yelldb.cacheText(update.message.text, result.sticker.file_id)
+          state.input = update.message.text
+          state.file_id = result.sticker.file_id
+          state.message_id = result.message_id
+          yelldb.saveChatState(state)
         else:
           logging.info("Too much text")
           update.message.reply_text("Too much text, sorry")
@@ -211,7 +279,11 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
           return
         cached = yelldb.cachedFile(photo.file_unique_id)
         if cached:
-          update.message.reply_document(document=cached)
+          result = update.message.reply_document(document=cached)
+          state.file_id = cached
+          state.message_id = result.message_id
+          state.input = None
+          yelldb.saveChatState(state)
           return
 
         f = c.bot.get_file(photo.file_id)
@@ -234,10 +306,19 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
         logging.info("Sent sticker %s", str(result))
         stickers.deleteSticker(sticker)
         os.unlink(path)
+
+        state.file_id = result.sticker.file_id
+        state.message_id = result.message_id
+        state.input = None
+        yelldb.saveChatState(state)
       elif update.message.sticker:
         if update.message.forward_from_chat and update.message.forward_from_chat.id == log_chan:
           # Do nothing if the message is from the log
           # This is for recovery relabeling
+          state.file_id = update.message.sticker.file_id
+          state.message_id = result.message_id
+          state.input = None
+          yelldb.saveChatState(state)
           return
         if yelldb.isTombstoned(update.message.sticker.file_unique_id):
           logging.info("Sending tombstone")
@@ -246,7 +327,11 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
         cached = yelldb.cachedFile(update.message.sticker.file_unique_id)
         if cached:
           logging.info("Sending cached sticker")
-          update.message.reply_document(document=cached)
+          result = update.message.reply_document(document=cached)
+          state.file_id = cached
+          state.message_id = result.message_id
+          state.input = None
+          yelldb.saveChatState(state)
           return
         if update.message.sticker.is_animated:
           f = c.bot.get_file(update.message.sticker.file_id) 
@@ -265,10 +350,11 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
           
           stickers.deleteSticker(sticker)
           os.unlink(path)
+          state.file_id = result.sticker.file_id
+          state.message_id = result.message_id
+          state.input = None
+          yelldb.saveChatState(state)
         else:
-          if update.message.sticker.set_name == 'OMYACendyne':
-            # Ignore this pack
-            return
           f = c.bot.get_file(update.message.sticker.file_id) 
           path = stickers.tempPathExt(update.message.sticker.file_id, "webp")
           f.download(path)
@@ -287,6 +373,10 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
           logging.info("Sent sticker %s", str(result))
           stickers.deleteSticker(sticker)
           os.unlink(path)
+          state.file_id = result.sticker.file_id
+          state.message_id = result.message_id
+          state.input = None
+          yelldb.saveChatState(state)
       elif update.message.document:
         doc = update.message.document
         # print("got document with mime type", doc.mime_type)
@@ -302,7 +392,11 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
         cached = yelldb.cachedFile(doc.file_unique_id)
         if cached:
           logging.info("Sending cached sticker")
-          update.message.reply_document(document=cached)
+          result = update.message.reply_document(document=cached)
+          state.file_id = cached
+          state.message_id = result.message_id
+          state.input = None
+          yelldb.saveChatState(state)
           return
 
         if doc.mime_type == "image/png" or doc.mime_type == "image/jpeg":
@@ -323,6 +417,11 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
           yelldb.cacheFile(doc.file_unique_id, result.sticker.file_id)
           stickers.deleteSticker(sticker)
           os.unlink(path)
+
+          state.file_id = result.sticker.file_id
+          state.message_id = result.message_id
+          state.input = None
+          yelldb.saveChatState(state)
         elif doc.mime_type == "image/svg+xml":
           f = c.bot.get_file(doc.file_id) 
           path = stickers.tempPathExt(doc.file_id, "png")
@@ -333,6 +432,10 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
             c.bot.send_document(chat_id=log_chan, document=result.sticker.file_id)
             logging.info("Sent text sticker: %s", str(result))
             yelldb.cacheFile(doc.file_unique_id, result.sticker.file_id)
+            state.file_id = result.sticker.file_id
+            state.input = None
+            state.message_id = result.message_id
+            yelldb.saveChatState(state)
           else:
             logging.info("Could not fit image")
             update.message.reply_text("SVG too complex could not import")
@@ -410,6 +513,7 @@ def main() -> None:
   # on different commands - answer in Telegram
   dispatcher.add_handler(CommandHandler("start", start))
   dispatcher.add_handler(CommandHandler("help", start))
+  dispatcher.add_handler(CommandHandler("cancel", cancel))
   dispatcher.add_handler(CommandHandler("learn", learn))
 
   # on non command i.e message - echo the message on Telegram

@@ -1,6 +1,9 @@
-from typing import List, Text, Tuple
+from typing import List, Text, Tuple, Union
 from db import localthreaddb, with_cursor, with_connection
 import logging
+from dataclasses import dataclass
+import pickle
+import base64
 
 @with_cursor
 def isTombstoned(input: Text) -> bool:
@@ -114,6 +117,46 @@ def submit(id: Text, name: Text, file_id: Text, chat_id: Text, message_id: Text)
     "message_id": message_id,
   })
 
+@dataclass
+class ChatState:
+  chat_id: int
+  file_id: Union[int, None] = None
+  input: Union[Text, None] = None
+  message_id: Union[int, None] = None
+  learning: bool = False
+
+
+@with_cursor
+def chatState(chat_id: int) -> ChatState:
+  result = localthreaddb.cur.execute("select state from yell_chat_state where chat_id = :chat_id", {
+    "chat_id": chat_id
+  }).fetchone()
+  if result and len(result) > 0:
+    state = pickle.loads(base64.standard_b64decode(result[0]))
+    logging.info("Got chat state %s", state)
+    return state
+  return ChatState(chat_id=chat_id)
+
+@with_cursor
+def saveChatState(state: ChatState):
+  chat_id = state.chat_id
+  logging.info("Saving chat state: %s", state)
+  body = base64.standard_b64encode(pickle.dumps(state))
+  [count] = localthreaddb.cur.execute("select count(*) from yell_chat_state where chat_id = :chat_id", {
+    "chat_id": chat_id
+  }).fetchone()
+  if count and count > 0:
+    localthreaddb.cur.execute("update yell_chat_state set state = :state where chat_id = :chat_id", {
+      "chat_id": chat_id,
+      "state": body
+    })
+  else:
+    localthreaddb.cur.execute("insert into yell_chat_state(chat_id, state) values (:chat_id, :state)", {
+      "chat_id": chat_id,
+      "state": body
+    })
+
+
 @with_connection
 @with_cursor
 def init():
@@ -131,3 +174,6 @@ def init():
 
   cur.execute("create table if not exists yell_tombstone (input)")
   cur.execute("create index if not exists yell_tombstone_idx on yell_tombstone (input)")
+
+  cur.execute("create table if not exists yell_chat_state (chat_id, state)")
+  cur.execute("create index if not exists yell_chat_state_chat_id on yell_chat_state (chat_id)")
