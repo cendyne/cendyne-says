@@ -61,6 +61,10 @@ def findPending(id: Text) -> [Text, Text, int, int]:
   }).fetchone()
 
 @with_cursor
+def findAllPending() -> [[int, Text, Text]]:
+  return localthreaddb.cur.execute("select id, name, file_id from yell_pending").fetchall()
+
+@with_cursor
 def countPending(name: Text, file_id: Text) -> int:
   [result] = localthreaddb.cur.execute("select count(*) from yell_pending where name = :name and file_id = :file_id", {
     "name": name,

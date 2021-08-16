@@ -522,6 +522,15 @@ def main() -> None:
   dispatcher.add_handler(CallbackQueryHandler(callback=callback))
   dispatcher.add_handler(InlineQueryHandler(inlinequery))
 
+  # for [id, name, file_id] in yelldb.findAllPending():
+  #   updater.bot.send_document(
+  #       chat_id=review_chan,
+  #       document=file_id,
+  #       reply_markup=InlineKeyboardMarkup([
+  #          [InlineKeyboardButton(name, callback_data="YES " + id)],
+  #          [InlineKeyboardButton("\u274C", callback_data="NO " + id)]
+  #       ]))
+
   # Start the Bot
   updater.start_polling()
 
