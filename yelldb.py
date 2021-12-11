@@ -8,7 +8,7 @@ from db import localthreaddb, with_cursor, with_connection
 
 @with_cursor
 def isTombstoned(key: Text) -> bool:
-    [results] = localthreaddb.cur.execute("select count(*) from yell_tombstone where key = :key", {
+    [results] = localthreaddb.cur.execute("select count(*) from yell_tombstone where input = :key", {
         "key": key
     }).fetchone()
     return results > 0
@@ -16,7 +16,7 @@ def isTombstoned(key: Text) -> bool:
 
 @with_cursor
 def tombstone(key: Text) -> bool:
-    localthreaddb.cur.execute("insert into yell_tombstone (key) values (:key) ", {
+    localthreaddb.cur.execute("insert into yell_tombstone (input) values (:key) ", {
         "key": key
     })
 
