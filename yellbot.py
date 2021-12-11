@@ -1,20 +1,29 @@
-import yelldb
-import textwrap
-import random
-import uuid
-from PIL import Image
-from cendyneyells import CendyneYells
-import emoji
 import os
 import traceback
 import sys
-import stickers
+import random
+import uuid
+import logging
+
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "lib"
+))
+
+import textwrap
+from PIL import Image
+
+import emoji
+
 import collections
 from telegram.ext import Updater, InlineQueryHandler, CommandHandler, CallbackContext, ChatMemberHandler, MessageHandler, Filters, CallbackQueryHandler
 from telegram import Update, InlineQueryResultCachedSticker, InlineKeyboardMarkup, InlineKeyboardButton
 from dotenv import load_dotenv
 
-import logging
+import yelldb
+from cendyneyells import CendyneYells
+import stickers
+
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
