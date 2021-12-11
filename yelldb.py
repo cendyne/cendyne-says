@@ -60,14 +60,14 @@ def cacheText(key: Text, file_id: Text) -> bool:
 
 
 @with_cursor
-def findPending(identity: Text) -> List[Text, Text, int, int]:
+def findPending(identity: Text) -> Tuple[Text, Text, int, int]:
     return localthreaddb.cur.execute("select name, file_id, chat_id, message_id from yell_pending where id = :identity", {
         "identity": identity
     }).fetchone()
 
 
 @with_cursor
-def findAllPending() -> List[List[int, Text, Text]]:
+def findAllPending() -> List[Tuple[int, Text, Text]]:
     return localthreaddb.cur.execute("select id, name, file_id from yell_pending").fetchall()
 
 
