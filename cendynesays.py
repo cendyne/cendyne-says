@@ -1,6 +1,12 @@
 import os
 import sys
 import logging
+
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "lib"
+))
+
 import grapheme
 from lottie.objects import BoundingBox
 from lottie.utils.font import FontStyle
@@ -11,10 +17,7 @@ import shapes
 import stickers
 
 
-sys.path.insert(0, os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "lib"
-))
+
 
 
 class CendyneSays:

@@ -1,7 +1,13 @@
 import sys
 import os
-import grapheme
 import logging
+
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "lib"
+))
+
+import grapheme
 from lottie.utils.animation import shake, rot_shake
 from lottie.utils.font import FontStyle
 from lottie import Color, Point
@@ -9,11 +15,6 @@ from lottie.parsers.svg import parse_svg_file
 from lottie import objects, exporters
 import stickers
 
-
-sys.path.insert(0, os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "lib"
-))
 
 particle_start = Point(520, 280)
 particle_scale = Point(50, 50)

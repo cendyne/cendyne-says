@@ -2,6 +2,12 @@ import sys
 import os
 import uuid
 import logging
+
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "lib"
+))
+
 from PIL import Image
 from lottie.utils.font import FontStyle
 from lottie import Color, Point
@@ -11,10 +17,6 @@ from lottie.parsers.tgs import parse_tgs
 from lottie import objects, exporters
 import stickers
 
-sys.path.insert(0, os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "lib"
-))
 
 particle_start = Point(10, 0)
 particle_scale = Point(50, 50)

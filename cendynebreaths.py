@@ -2,6 +2,12 @@ import sys
 import os
 import random
 import math
+
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "lib"
+))
+
 import grapheme
 from lottie.utils import animation as anutils
 from lottie.utils.font import FontStyle
@@ -10,10 +16,7 @@ from lottie.parsers.svg import parse_svg_file
 from lottie import objects, exporters
 import stickers
 
-sys.path.insert(0, os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "lib"
-))
+
 
 particle_start_single = Point(520, 280)
 particle_start = Point(380, 440)
