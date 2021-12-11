@@ -1,4 +1,4 @@
-from lottie.nvector import NVector, Point
+from lottie.nvector import Point
 from lottie.objects import Path, Bezier
 import logging
 ## @ingroup Lottie
