@@ -194,7 +194,7 @@ def learn(update: Update, c: CallbackContext) -> None:
     if not c.args or len(c.args) == 0:
         if update.message.reply_to_message and update.message.reply_to_message.sticker:
             msg = update.message.reply_to_message
-            if msg.from_user.id == c.bot.id or (msg.forward_from_chat and msg.forward_from_chat.id == log_chan):
+            if msg.from_user.id == c.bot.id or msg.from_user.id == admin or (msg.forward_from_chat and msg.forward_from_chat.id == log_chan):
                 state.file_id = msg.sticker.file_id
                 state.message_id = msg.message_id
                 update.message.reply_text(
