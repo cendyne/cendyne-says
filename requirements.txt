@@ -2,6 +2,7 @@ APScheduler==3.6.3
 cachetools==4.2.2
 certifi==2021.10.8
 emoji==1.6.1
+fonttools==4.28.3
 grapheme==0.6.0
 lottie==0.6.10
 Pillow==8.4.0
