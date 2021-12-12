@@ -57,8 +57,8 @@ class CaptchaSays:
                 layer.transform.position.value.x = 230
             if layer.transform.position.value.y < 0:
                 layer.transform.position.value.y = 0
-            if layer.transform.position.value.y > 200:
-                layer.transform.position.value.y = 200
+            if layer.transform.position.value.y > 180:
+                layer.transform.position.value.y = 180
 
             x += bb.width + 10 + (secrets.randbits(4))
             y += secrets.randbits(2)
