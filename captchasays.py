@@ -50,6 +50,16 @@ class CaptchaSays:
             layer.transform.position.value.x = x + secrets.randbits(4) - 8
             layer.transform.position.value.y = y + secrets.randbits(5) - 16
 
+            # Do not let characters go off the canvas
+            if layer.transform.position.value.x < 0:
+                layer.transform.position.value.x = 0
+            if layer.transform.position.value.x > 230:
+                layer.transform.position.value.x = 230
+            if layer.transform.position.value.y < 0:
+                layer.transform.position.value.y = 0
+            if layer.transform.position.value.y > 200:
+                layer.transform.position.value.y = 200
+
             x += bb.width + 10 + (secrets.randbits(4))
             y += secrets.randbits(2)
             if x > 210:

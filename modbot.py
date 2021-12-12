@@ -2,6 +2,8 @@ import time
 import os
 import logging
 import re
+import traceback
+import sys
 from typing import List, Text, Union
 import telegram
 from telegram.chat import Chat
@@ -402,6 +404,25 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
         # traceback.print_exception(*sys.exc_info())
         logging.exception("A problem I guess")
 
+with_connection
+def selftest(update: Update, c: CallbackContext) -> None:
+    try:
+        if update.message:
+            message = update.message
+            chat_type = message.chat.type
+            if chat_type == CHAT_PRIVATE or (isUserAnAdmin(c, update.message.chat_id, update.message.from_user) and (chat_type == CHAT_GROUP or chat_type == CHAT_SUPERGROUP)):
+                sticker = captcha.makeSticker(randomChallenge())
+                if stickers.validSize(sticker):
+                    try:
+                        c.bot.send_document(chat_id=message.chat.id, document=open(sticker, "rb"))
+                    except:
+                        message.reply_text("Couldn't do it")
+                stickers.deleteSticker(sticker)
+        pass
+    except Exception as ex:
+        # print("A problem I guess")
+        traceback.print_exception(*sys.exc_info())
+        logging.exception("A problem I guess")
 
 @with_connection
 def inlinequery(update: Update, c: CallbackContext) -> None:
@@ -523,6 +544,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler("dischannel", disableChannelPosts))
     dispatcher.add_handler(CommandHandler("enautobanchannel", enableAutoBanChannelPosts))
     dispatcher.add_handler(CommandHandler("disautobanchannel", disableAutoBanChannelPosts))
+    dispatcher.add_handler(CommandHandler("selftest", selftest))
     dispatcher.add_handler(CommandHandler("help", help))
 
     # on non command i.e message - echo the message on Telegram
