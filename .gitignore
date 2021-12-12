@@ -13,3 +13,4 @@ temp
 *.log
 *.pid
 backups
+private-notes.txt

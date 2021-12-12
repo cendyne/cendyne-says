@@ -15,6 +15,14 @@ There's not really a python package file or whatever, you'll have to look at the
 
 Also, you'll have to patch the python lottie dependency, search for font.cmap and replace it with font.font.cmap. The fix is not published yet.
 
+```
+pip install -r requirements.txt
+```
+On freebsd, py38-sqlite is needed too
+
+In the vscode container, it may be stupidly slow in the terminal because of git.
+`git config codespaces-theme.hide-status 1` will hide the status.
+
 # Environment
 Copy the `example-dot-env` file to `.env` and set things up.
 
