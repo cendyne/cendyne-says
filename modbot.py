@@ -409,9 +409,12 @@ def selftest(update: Update, c: CallbackContext) -> None:
     try:
         if update.message:
             message = update.message
+            challenge = randomChallenge()
+            if message.text.startswith("/selftest "):
+                challenge = re.sub(r'[^a-zA-Z0-9]', '', message.text[10:]).upper().upper()
             chat_type = message.chat.type
             if chat_type == CHAT_PRIVATE or (isUserAnAdmin(c, update.message.chat_id, update.message.from_user) and (chat_type == CHAT_GROUP or chat_type == CHAT_SUPERGROUP)):
-                sticker = captcha.makeSticker(randomChallenge())
+                sticker = captcha.makeSticker(challenge)
                 if stickers.validSize(sticker):
                     try:
                         c.bot.send_document(chat_id=message.chat.id, document=open(sticker, "rb"))
