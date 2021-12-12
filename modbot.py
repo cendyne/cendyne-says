@@ -185,6 +185,43 @@ def disableChannelPosts(update: Update, c: CallbackContext) -> None:
 
 
 @with_connection
+def enableAutoBanChannelPosts(update: Update, c: CallbackContext) -> None:
+    if not isUserAnAdmin(c, update.message.chat_id, update.message.from_user):
+        logging.info("Update ignored %s", update)
+        return
+    logging.info("Enable Auto Ban Channel posting issued %s", update)
+    state = moddb.chatState(update.message.chat_id)
+
+    if moddb.enableAutoBanChannelPostingNoSave(state):
+        also = None
+        if not state.channel_post_disabled:
+            moddb.disableChannelPostingNoSave(state)
+            also = "Also, Anonymous Channel Posting is now disabled"
+        moddb.saveChatState(state)
+        update.message.reply_text('Anonymous Channel Posting which will ban the senders ability to post anonymously is now enabled')
+        if also:
+            update.message.reply_text(also)
+    else:
+        update.message.reply_text(
+            'Anonymous Channel Posting which will ban the senders ability to post anonymously was already enabled')
+
+
+@with_connection
+def disableAutoBanChannelPosts(update: Update, c: CallbackContext) -> None:
+    if not isUserAnAdmin(c, update.message.chat_id, update.message.from_user):
+        logging.info("Update ignored %s", update)
+        return
+    logging.info("Disable Auto Ban Channel posting issued %s", update)
+    state = moddb.chatState(update.message.chat_id)
+
+    if moddb.disableAutoBanChannelPostingNoSave(state):
+        moddb.saveChatState(state)
+        update.message.reply_text('Anonymous Channel Posting which will ban the senders ability to post anonymously is now disabled')
+    else:
+        update.message.reply_text(
+            'Anonymous Channel Posting which will ban the senders ability to post anonymously was already disabled')
+
+@with_connection
 def help(update: Update, c: CallbackContext) -> None:
     logging.info("Help issued %s", update)
     # TODO handle start with contextual command thing from a group
@@ -296,27 +333,37 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
             if message.sender_chat and message.sender_chat.id:
                 sender_chat_id = message.sender_chat.id
             if from_username is None and from_firstname == "Telegram" and from_user_id == 777000:
-                official_post = True
+                if message.is_automatic_forward:
+                    official_post = True
+                else:
+                    # This may be a spoof
+                    channel_post = True
+
             if chat_type == CHAT_GROUP or chat_type == CHAT_SUPERGROUP:
                 state = moddb.chatState(chat_id)
                 changed = False
                 # logging.info("This is a group")
                 if official_post:
-                    changed = moddb.permitChannelPostsNoSave(
-                        state, sender_chat_id) or changed
+                    changed = moddb.permitChannelPostsNoSave(state, sender_chat_id) or changed
                 elif channel_post and state.channel_post_disabled:
                     if sender_chat_id in state.permitted_channel_posts:
-                        message.reply_text(
-                            "This is an officially linked channel")
+                        # message.reply_text("This is an officially linked channel")
                         pass
                     else:
-                        if not message.delete():
+                        if message.delete():
+                            if sender_chat_id and state.auto_ban_sender_chats:
+                                if not c.bot.ban_chat_sender_chat(chat_id, sender_chat_id):
+                                    if not doIHaveRestrictPermissions(c, chat_id):
+                                        message.reply_text(
+                                            "I tried to ban a channel from posting here but I do not have permissions")
+                        else:
                             if not doIHaveDeletePermissions(c, chat_id):
                                 message.reply_text(
                                     "This is a channel post and I tried to delete it but I do not have permissions")
                             else:
                                 logging.info(
                                     "Did another bot snipe this message from me?")
+                        
                 if changed:
                     logging.info("Adjusting chat state: %s", state)
                     moddb.saveChatState(state)
@@ -382,14 +429,21 @@ def callbackhandler(update: Update, c: CallbackContext) -> None:
                 challenge = moddb.find_challenge(state.challenge_chat_id, state.user_id)
                 sticker = captcha.makeSticker(challenge)
                 if stickers.validSize(sticker):
+                    sticker_file = None
                     try:
                         result = c.bot.send_document(chat_id=query.message.chat.id, document=open(sticker, "rb"))
                         state.challenge_message_id = result.message_id
                         moddb.saveChatState(state)
+                        
+                        if result.sticker and result.sticker.file_id:
+                           sticker_file = result.sticker.file_id
                     except:
                         query.message.edit_reply_markup(reply_markup=None)
                         query.message.edit_text("I had an error so you get a free ride")
                         challengeCleared(c, state, query.from_user)
+                    # Save this sticker for later access
+                    if log_chan and sticker_file:
+                         c.bot.send_document(log_chan, sticker_file)
                 else:
                     # cry
                     query.message.edit_reply_markup(reply_markup=None)
@@ -450,7 +504,9 @@ def main() -> None:
         BotCommand("/enchallenge", "Enable Challenges"),
         BotCommand("/dischallenge", "Disable Challenges"),
         BotCommand("/enchannel", "Enable Channel Posts"),
-        BotCommand("/dischannel", "Disable Channel Posts")
+        BotCommand("/dischannel", "Disable Channel Posts"),
+        BotCommand("/enautobanchannel", "Enable Auto Ban Channel Posts"),
+        BotCommand("/disautobanchannel", "Disable Auto Ban Channel Posts"),
     ], scope=BotCommandScopeAllChatAdministrators())
 
     logging.info("Bot %s %s", bot.id, bot.username)
@@ -465,6 +521,8 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler("dischallenge", disableChallenge))
     dispatcher.add_handler(CommandHandler("enchannel", enableChannelPosts))
     dispatcher.add_handler(CommandHandler("dischannel", disableChannelPosts))
+    dispatcher.add_handler(CommandHandler("enautobanchannel", enableAutoBanChannelPosts))
+    dispatcher.add_handler(CommandHandler("disautobanchannel", disableAutoBanChannelPosts))
     dispatcher.add_handler(CommandHandler("help", help))
 
     # on non command i.e message - echo the message on Telegram

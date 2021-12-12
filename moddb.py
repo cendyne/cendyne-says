@@ -83,6 +83,7 @@ class ChatState:
     channel_post_disabled: bool = False
     permitted_channel_posts: Set[int] = field(default_factory=set)
     challenge_expires_seconds: float = 86400
+    auto_ban_sender_chats: bool = False
     # Direct message only
     user_id: Union[int, None] = None
     challenge_chat_id: Union[int, None] = None
@@ -96,6 +97,9 @@ def chatState(chat_id: int) -> ChatState:
     try:
         if result and len(result) > 0:
             state = pickle.loads(base64.standard_b64decode(result[0]))
+            # Upgrade the state object since pickle will have the old version in
+            if state.auto_ban_sender_chats is None:
+                state.auto_ban_sender_chats = False
             # logging.info("Got chat state %s", state)
             return state
     except:
@@ -174,6 +178,28 @@ def disableChannelPostingNoSave(state: ChatState) -> bool:
 def disableChannelPosting(chat_id: int) -> None:
     state = chatState(chat_id)
     if disableChannelPostingNoSave(state):
+        saveChatState(state)
+
+def enableAutoBanChannelPostingNoSave(state: ChatState) -> bool:
+    if state.user_id is None and not state.auto_ban_sender_chats:
+        state.auto_ban_sender_chats = True
+        return True
+    return False
+
+def enableAutoBanChannelPosting(chat_id: int) -> None:
+    state = chatState(chat_id)
+    if enableAutoBanChannelPostingNoSave(state):
+        saveChatState(state)
+
+def disableAutoBanChannelPostingNoSave(state: ChatState) -> bool:
+    if state.user_id is None and state.auto_ban_sender_chats:
+        state.auto_ban_sender_chats = False
+        return True
+    return False
+
+def disableAutoBanChannelPosting(chat_id: int) -> None:
+    state = chatState(chat_id)
+    if disableAutoBanChannelPostingNoSave(state):
         saveChatState(state)
 
 def permitChannelPostsNoSave(state: ChatState, channel_id: int) -> bool:
