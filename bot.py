@@ -51,17 +51,24 @@ def makeSticker(text):
     if text != oldtext:
         logging.info("Text converted to %s", text)
 
+    reverse = False
+    if text.startswith("reverse:"):
+        reverse = True
+        text = text[8:].strip()
     elements = list(grapheme.graphemes(text))
 
     try:
         le = len(elements)
         if le <= 4:
             if le == 3 and elements[0] == elements[1] and elements[1] == elements[2]:
-                for count in [40, 30, 20, 10, 5, 4, 3, 2, 1, 0]:
+                counts = [40, 30, 20, 10, 5, 4, 3, 2, 1, 0]
+                if reverse:
+                    counts = [10, 8, 5, 4, 3, 2, 1, 0]
+                for count in counts:
                     if count == 0:
                         sticker = say.makeSticker("Unsupported :(")
                         break
-                    sticker = breathes.makeSticker(text, count)
+                    sticker = breathes.makeSticker(text, count, reverse)
                     if not stickers.validSize(sticker):
                         # Try a smaller particle size until the file is
                         # within Telegram's requirement
@@ -90,7 +97,7 @@ def makeSticker(text):
     except Exception as ex:
         # print("Exception ex", ex)
         # traceback.print_exception(*sys.exc_info())
-        logging.exception("An error")
+        logging.exception("An error %s", ex)
         text = ".-. An error"
         keep = True
         sticker = say.makeSticker(text)
@@ -145,7 +152,7 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
     except Exception as ex:
         # print("A problem I guess")
         # traceback.print_exception(*sys.exc_info())
-        logging.exception("A problem I guess")
+        logging.exception("A problem I guess, %s", ex)
         saysdb.tombstone(update.message.text)
 
 

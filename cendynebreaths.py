@@ -2,6 +2,7 @@ import sys
 import os
 import random
 import math
+import logging
 
 sys.path.insert(0, os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -11,7 +12,8 @@ sys.path.insert(0, os.path.join(
 import grapheme
 from lottie.utils import animation as anutils
 from lottie.utils.font import FontStyle
-from lottie import Color, Point, PolarVector
+from lottie.objects import easing
+from lottie import Color, Point, PolarVector, NVector
 from lottie.parsers.svg import parse_svg_file
 from lottie import objects, exporters
 import stickers
@@ -19,15 +21,43 @@ import stickers
 
 
 particle_start_single = Point(520, 280)
-particle_start = Point(380, 440)
+particle_start = Point(380, 500)
 particle_scale = Point(50, 50)
 particle_end = Point(1000, -100)
 partical_radius = 1200.0
 start_len_min = 0
 start_len_max = 60
 opacity_start = 100
-opacity_end = -20
+opacity_end = 0
 last_frame = 60
+
+
+def follow_path(position_prop, bezier, start_time, end_time, n_keyframes,
+                reverse=False, offset=NVector(0, 0), start_t=0):
+    delta = (end_time - start_time) / (n_keyframes-1)
+    fact = start_t
+    factd = 1 / (n_keyframes-1)
+
+    jumps = 0
+    handled_jump = False
+    for i in range(n_keyframes):
+        time = start_time + i * delta
+        if fact > 1 + factd/2:
+            fact -= 1
+            if time != start_time:
+                jumps += 1
+                easing.Jump()(position_prop.keyframes[-1])
+
+        f = 1 - fact if reverse else fact
+        position_prop.add_keyframe(time, bezier.point_at(f)+offset)
+        if jumps == 1 and not handled_jump:
+            # Hide it by shoving it off canvas
+            x = position_prop.keyframes[-2]
+            position_prop.add_keyframe(x.time + 1, NVector(1500,1500))
+            easing.Jump()(position_prop.keyframes[-1])
+            handled_jump = True
+
+        fact += factd
 
 
 class CendyneBreathes:
@@ -38,7 +68,7 @@ class CendyneBreathes:
         )).layers[0]
         self.sticker.transform.position.value.y = 340
 
-    def textToSticker(self, text, particle_count):
+    def textToSticker(self, text, particle_count, reverse=False):
 
         style = FontStyle("Comic Mono", 300, emoji_svg="emojis/")
 
@@ -61,27 +91,6 @@ class CendyneBreathes:
                 layer.transform.scale.value = particle_scale.clone()
 
                 t = i / particle_count
-                for thing in layer.shapes:
-                    if hasattr(thing, 'opacity'):
-                        thing.opacity.add_keyframe(
-                            0, opacity_start + (opacity_end - opacity_start) * t)
-                        thing.opacity.add_keyframe(
-                            (1 - t) * last_frame, opacity_end)
-                        thing.opacity.add_keyframe(
-                            (1 - t) * last_frame+1, opacity_start)
-                        thing.opacity.add_keyframe(
-                            last_frame, opacity_start + (opacity_end - opacity_start) * t)
-                    elif hasattr(thing, 'shapes'):
-                        for thingy in thing.shapes:
-                            if hasattr(thingy, 'opacity'):
-                                thingy.opacity.add_keyframe(
-                                    0, opacity_start + (opacity_end - opacity_start) * t)
-                                thingy.opacity.add_keyframe(
-                                    (1 - t) * last_frame, opacity_end)
-                                thingy.opacity.add_keyframe(
-                                    (1 - t) * last_frame+1, opacity_start)
-                                thingy.opacity.add_keyframe(
-                                    last_frame, opacity_start + (opacity_end - opacity_start) * t)
 
                 bezier = objects.Bezier()
                 outp = PolarVector(random.uniform(
@@ -90,12 +99,16 @@ class CendyneBreathes:
                 local_particle_end = particle_start.clone()
                 local_particle_end.x += partical_radius * math.cos(angle)
                 local_particle_end.y += partical_radius * math.sin(angle)
-                bezier.add_point(particle_start, outp=outp)
-                bezier.add_point(local_particle_end, outp)
+                if reverse:
+                    bezier.add_point(local_particle_end, outp=outp)
+                    bezier.add_point(particle_start, outp)
+                else:
+                    bezier.add_point(particle_start, outp=outp)
+                    bezier.add_point(local_particle_end, outp)
 
-                # b.size.value = particle_size
-                anutils.follow_path(layer.transform.position,
-                                    bezier, 0, last_frame, 10, start_t=t)
+                follow_path(layer.transform.position,
+                            bezier, 0, last_frame, 10, start_t=t)
+
             # No more particles
             an.add_layer(self.sticker.clone())
 
@@ -103,6 +116,6 @@ class CendyneBreathes:
 
     # exporters.export_svg(an, "says.svg")
 
-    def makeSticker(self, text, count=10):
-        self.textToSticker(text, count)
+    def makeSticker(self, text, count=10, reverse=False):
+        self.textToSticker(text, count, reverse)
         return stickers.tempPath(text)
