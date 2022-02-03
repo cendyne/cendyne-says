@@ -61,7 +61,7 @@ def follow_path(position_prop, bezier, start_time, end_time, n_keyframes,
 
 class CendyneBreathes:
     def __init__(self):
-        if os.environ["USE_GLEAM"]:
+        if os.getenv("USE_GLEAM") is not None:
             self.sticker = parse_svg_file(os.path.join(
                 os.path.dirname(os.path.abspath(__file__)),
                 "assets/gleam.svg"
