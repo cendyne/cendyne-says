@@ -2,7 +2,6 @@ import sys
 import os
 import random
 import math
-import logging
 
 sys.path.insert(0, os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -21,7 +20,7 @@ import stickers
 
 
 particle_start_single = Point(520, 280)
-particle_start = Point(380, 500)
+particle_start = Point(380, 460)
 particle_scale = Point(50, 50)
 particle_end = Point(1000, -100)
 partical_radius = 1200.0
@@ -62,11 +61,18 @@ def follow_path(position_prop, bezier, start_time, end_time, n_keyframes,
 
 class CendyneBreathes:
     def __init__(self):
-        self.sticker = parse_svg_file(os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "assets/cendyne-smol.svg"
-        )).layers[0]
-        self.sticker.transform.position.value.y = 340
+        if os.environ["USE_GLEAM"]:
+            self.sticker = parse_svg_file(os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "assets/gleam.svg"
+            )).layers[0]
+            self.sticker.transform.position.value.y = 340
+        else:
+            self.sticker = parse_svg_file(os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "assets/cendyne-smol.svg"
+            )).layers[0]
+            self.sticker.transform.position.value.y = 340
 
     def textToSticker(self, text, particle_count, reverse=False):
 
@@ -102,15 +108,15 @@ class CendyneBreathes:
                 if reverse:
                     bezier.add_point(local_particle_end, outp=outp)
                     bezier.add_point(particle_start, outp)
+                    follow_path(layer.transform.position,
+                            bezier, 0, last_frame, 10, start_t=t)
                 else:
                     bezier.add_point(particle_start, outp=outp)
                     bezier.add_point(local_particle_end, outp)
-
-                follow_path(layer.transform.position,
+                    anutils.follow_path(layer.transform.position,
                             bezier, 0, last_frame, 10, start_t=t)
-
-            # No more particles
-            an.add_layer(self.sticker.clone())
+        # No more
+        an.insert_layer(0, self.sticker.clone())
 
         exporters.export_tgs(an, stickers.tempPath(text), True, False)
 
