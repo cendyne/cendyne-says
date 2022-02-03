@@ -6,7 +6,7 @@ expiringdict==1.2.1
 fonttools==4.28.3
 grapheme==0.6.0
 lottie==0.6.10
-Pillow==8.4.0
+Pillow>=9.0.0
 python-dotenv==0.19.2
 python-telegram-bot==13.9
 pytz==2021.3
