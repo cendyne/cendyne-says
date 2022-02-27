@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from db import localthreaddb, with_cursor, with_connection
 
 @with_cursor
-def isChallenged(chat_id: int, user_id: int) -> bool:
+def is_challenged(chat_id: int, user_id: int) -> bool:
     [results] = localthreaddb.cur.execute("select count(*) from mod_challenge where chat_id = :chat_id and user_id = :user_id", {
         "chat_id": chat_id,
         "user_id": user_id
@@ -90,7 +90,7 @@ class ChatState:
     challenge_message_id: Union[int, None] = None
 
 @with_cursor
-def chatState(chat_id: int) -> ChatState:
+def chat_state(chat_id: int) -> ChatState:
     result = localthreaddb.cur.execute("select state from mod_chat_state where chat_id = :chat_id", {
         "chat_id": chat_id
     }).fetchone()
@@ -109,7 +109,7 @@ def chatState(chat_id: int) -> ChatState:
 
 
 @with_cursor
-def saveChatState(state: ChatState):
+def save_chat_state(state: ChatState):
     chat_id = state.chat_id
     logging.info("Saving chat state: %s", state)
     body = base64.standard_b64encode(pickle.dumps(state))
@@ -127,102 +127,102 @@ def saveChatState(state: ChatState):
             "state": body
         })
 
-def chatStateWithUser(chat_id: int, user_id: int) -> ChatState:
-    state = chatState(chat_id)
+def chat_state_with_user(chat_id: int, user_id: int) -> ChatState:
+    state = chat_state(chat_id)
     if state.user_id is None:
         state.user_id = user_id
-        saveChatState(state)
+        save_chat_state(state)
     return state
 
-def enableChallengeNoSave(state: ChatState) -> bool:
+def enable_challenge_no_save(state: ChatState) -> bool:
     if state.user_id is None and not state.challenge_enabled:
         state.challenge_enabled = True
         return True
     return False
 
-def enableChallenge(chat_id: int) -> None:
-    state = chatState(chat_id)
-    if enableChallengeNoSave(state):
-        saveChatState(state)
+def enable_challenge(chat_id: int) -> None:
+    state = chat_state(chat_id)
+    if enable_challenge_no_save(state):
+        save_chat_state(state)
 
-def disableChallengeNoSave(state: ChatState) -> bool:
+def disable_challenge_no_save(state: ChatState) -> bool:
     if state.user_id is None and state.challenge_enabled:
         state.challenge_enabled = False
         return True
     return False
 
-def disableChallenge(chat_id: int) -> None:
-    state = chatState(chat_id)
-    if disableChallengeNoSave(state):
-        saveChatState(state)
+def disable_challenge(chat_id: int) -> None:
+    state = chat_state(chat_id)
+    if disable_challenge_no_save(state):
+        save_chat_state(state)
         for user_id in find_all_challenges(chat_id):
             remove_challenge(chat_id, user_id)
 
-def enableChannelPostingNoSave(state: ChatState) -> bool:
+def enable_channel_posting_no_save(state: ChatState) -> bool:
     if state.user_id is None and state.channel_post_disabled:
         state.channel_post_disabled = False
         return True
     return False
 
-def enableChannelPosting(chat_id: int) -> None:
-    state = chatState(chat_id)
-    if enableChannelPostingNoSave(state):
-        saveChatState(state)
+def enable_channel_posting(chat_id: int) -> None:
+    state = chat_state(chat_id)
+    if enable_channel_posting_no_save(state):
+        save_chat_state(state)
 
-def disableChannelPostingNoSave(state: ChatState) -> bool:
+def disable_channel_posting_no_save(state: ChatState) -> bool:
     if state.user_id is None and not state.channel_post_disabled:
         state.channel_post_disabled = True
         return True
     return False
 
-def disableChannelPosting(chat_id: int) -> None:
-    state = chatState(chat_id)
-    if disableChannelPostingNoSave(state):
-        saveChatState(state)
+def disable_channel_posting(chat_id: int) -> None:
+    state = chat_state(chat_id)
+    if disable_channel_posting_no_save(state):
+        save_chat_state(state)
 
-def enableAutoBanChannelPostingNoSave(state: ChatState) -> bool:
+def enable_auto_ban_channel_posting_no_save(state: ChatState) -> bool:
     if state.user_id is None and not state.auto_ban_sender_chats:
         state.auto_ban_sender_chats = True
         return True
     return False
 
-def enableAutoBanChannelPosting(chat_id: int) -> None:
-    state = chatState(chat_id)
-    if enableAutoBanChannelPostingNoSave(state):
-        saveChatState(state)
+def enable_auto_ban_channel_posting(chat_id: int) -> None:
+    state = chat_state(chat_id)
+    if enable_auto_ban_channel_posting_no_save(state):
+        save_chat_state(state)
 
-def disableAutoBanChannelPostingNoSave(state: ChatState) -> bool:
+def disable_auto_ban_channel_posting_no_save(state: ChatState) -> bool:
     if state.user_id is None and state.auto_ban_sender_chats:
         state.auto_ban_sender_chats = False
         return True
     return False
 
-def disableAutoBanChannelPosting(chat_id: int) -> None:
-    state = chatState(chat_id)
-    if disableAutoBanChannelPostingNoSave(state):
-        saveChatState(state)
+def disable_auto_ban_channel_posting(chat_id: int) -> None:
+    state = chat_state(chat_id)
+    if disable_auto_ban_channel_posting_no_save(state):
+        save_chat_state(state)
 
-def permitChannelPostsNoSave(state: ChatState, channel_id: int) -> bool:
+def permit_channel_osts_no_save(state: ChatState, channel_id: int) -> bool:
     if not channel_id in state.permitted_channel_posts:
         state.permitted_channel_posts.add(channel_id)
         return True
     return False
 
-def permitChannelPosts(chat_id: int, channel_id: int) -> None:
-    state = chatState(chat_id)
-    if permitChannelPostsNoSave(state, channel_id):
-        saveChatState(state)
+def permit_channel_osts(chat_id: int, channel_id: int) -> None:
+    state = chat_state(chat_id)
+    if permit_channel_osts_no_save(state, channel_id):
+        save_chat_state(state)
 
-def revokeChannelPostsNoSave(state: ChatState, channel_id: int) -> bool:
+def revoke_channel_posts_no_save(state: ChatState, channel_id: int) -> bool:
     if channel_id in state.permitted_channel_posts:
         state.permitted_channel_posts.remove(channel_id)
         return True
     return False
 
-def revokeChannelPosts(chat_id: int, channel_id: int) -> None:
-    state = chatState(chat_id)
-    if revokeChannelPostsNoSave(state, channel_id):
-        saveChatState(state)
+def revoke_channel_posts(chat_id: int, channel_id: int) -> None:
+    state = chat_state(chat_id)
+    if revoke_channel_posts_no_save(state, channel_id):
+        save_chat_state(state)
 
 
 

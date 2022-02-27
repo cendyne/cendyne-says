@@ -6,7 +6,6 @@ import traceback
 import sys
 from typing import List, Text, Union
 import telegram
-from telegram.chat import Chat
 from telegram.chatmember import ChatMember
 from telegram.chatpermissions import ChatPermissions
 from telegram.constants import CHAT_CHANNEL, CHAT_GROUP, CHAT_PRIVATE, CHAT_SENDER, CHAT_SUPERGROUP
@@ -15,8 +14,8 @@ from expiringdict import ExpiringDict
 import secrets
 # import uuid
 
-from telegram.ext import Updater, InlineQueryHandler, CommandHandler, CallbackContext, ChatMemberHandler, MessageHandler, Filters, CallbackQueryHandler
-from telegram import Update, BotCommand, BotCommandScopeAllGroupChats, BotCommandScopeAllPrivateChats
+from telegram.ext import Updater, InlineQueryHandler, CommandHandler, CallbackContext, MessageHandler, Filters, CallbackQueryHandler
+from telegram import Update, BotCommand, BotCommandScopeAllPrivateChats
 from dotenv import load_dotenv
 from telegram.inline.inlinekeyboardbutton import InlineKeyboardButton
 from telegram.inline.inlinekeyboardmarkup import InlineKeyboardMarkup
@@ -35,19 +34,21 @@ logging.getLogger('pscheduler.executors.default').setLevel(logging.WARN)
 
 load_dotenv()
 
-letters = "cdefhjkmnprtvwxy2345689"
+LETTERS = "cdefhjkmnprtvwxy2345689"
 
 token = os.environ["MOD_TOKEN"]
 log_chan = int(os.getenv("LOG_CHAN"))
 
 admins_by_chat_id = ExpiringDict(max_len=100, max_age_seconds=60)
 
-def randomChallenge() -> Text:
-    challenge = "".join([secrets.choice(letters).upper() for i in range(8)])
+def random_challenge() -> Text:
+    """Generates a random challenge text"""
+    challenge = "".join([secrets.choice(LETTERS).upper() for i in range(8)])
     logging.info("Generated challenge: %s", challenge)
     return challenge
 
-def getAdmins(c: CallbackContext, chat_id: int) -> List[ChatMember]:
+def get_admins(c: CallbackContext, chat_id: int) -> List[ChatMember]:
+    """Gets list of admins for this chat"""
     if chat_id in admins_by_chat_id:
         try:
             return admins_by_chat_id[chat_id]
@@ -58,33 +59,37 @@ def getAdmins(c: CallbackContext, chat_id: int) -> List[ChatMember]:
     return admins
 
 
-def getMyAdminUser(c: CallbackContext, chat_id: int) -> Union[ChatMember, None]:
-    for user in getAdmins(c, chat_id):
+def get_my_admin_user(c: CallbackContext, chat_id: int) -> Union[ChatMember, None]:
+    """Tests if the bot itself is listed as an admin"""
+    for user in get_admins(c, chat_id):
         if user.user and user.user.id == c.bot.id:
             return user
     return None
 
 
-def doIHaveDeletePermissions(c: CallbackContext, chat_id: int) -> bool:
-    user = getMyAdminUser(c, chat_id)
+def do_i_have_delete_permissions(c: CallbackContext, chat_id: int) -> bool:
+    """Checks if this bot has delete permissions"""
+    user = get_my_admin_user(c, chat_id)
     if user:
         return user.can_delete_messages
     return False
 
 
-def doIHaveRestrictPermissions(c: CallbackContext, chat_id: int) -> bool:
-    user = getMyAdminUser(c, chat_id)
+def do_i_have_restrict_permissions(c: CallbackContext, chat_id: int) -> bool:
+    """Checks if this bot has restriction permissions"""
+    user = get_my_admin_user(c, chat_id)
     if user:
         return user.can_restrict_members
     return False
 
 
-def isUserAnAdmin(c: CallbackContext, chat_id: int, user: User) -> bool:
+def is_user_an_admin(c: CallbackContext, chat_id: int, user: User) -> bool:
+    """Checks if a specified user is in the admin list"""
     logging.info("Is user %s an admin in chat %s?", user, chat_id)
     if user.is_bot and user.username == "GroupAnonymousBot":
         # Only admins can use GroupAnonymousBot
         return True
-    for admin in getAdmins(c, chat_id):
+    for admin in get_admins(c, chat_id):
         logging.info("Inspecting user %s", user)
         if admin.user and admin.user.id == user.id:
             logging.info("Yes, user %s is an admin in chat %s", user, chat_id)
@@ -102,8 +107,8 @@ def start(update: Update, _: CallbackContext) -> None:
     if message:
         chat_id = message.chat_id
         chat_type = message.chat.type
-        from_username = message.from_user.username
-        from_firstname = message.from_user.first_name
+        # from_username = message.from_user.username
+        # from_firstname = message.from_user.first_name
         from_user_id = message.from_user.id
         if chat_type == CHAT_PRIVATE:
             if message.text.startswith("/start "):
@@ -115,10 +120,10 @@ def start(update: Update, _: CallbackContext) -> None:
                 else:
                     # This isn't normal
                     return
-                if moddb.isChallenged(regarding_chat_id, from_user_id):
-                    state = moddb.chatStateWithUser(chat_id, from_user_id)
+                if moddb.is_challenged(regarding_chat_id, from_user_id):
+                    state = moddb.chat_state_with_user(chat_id, from_user_id)
                     state.challenge_chat_id = regarding_chat_id
-                    moddb.saveChatState(state)
+                    moddb.save_chat_state(state)
                     message.reply_text('Hello you are about to challenged with a captcha. Your goal is to type the sequence of letters from left to right, top to bottom.', reply_markup=InlineKeyboardMarkup([
                         [InlineKeyboardButton("I understand", callback_data="understood")]
                     ]))
@@ -129,42 +134,45 @@ def start(update: Update, _: CallbackContext) -> None:
 
 
 @with_connection
-def enableChallenge(update: Update, c: CallbackContext) -> None:
-    if not isUserAnAdmin(c, update.message.chat_id, update.message.from_user):
+def enable_challenge(update: Update, c: CallbackContext) -> None:
+    """Handler for enabling the challenge"""
+    if not is_user_an_admin(c, update.message.chat_id, update.message.from_user):
         logging.info("Update ignored %s", update)
         return
     logging.info("Enable Challenge issued %s", update)
-    state = moddb.chatState(update.message.chat_id)
-    if moddb.enableChallengeNoSave(state):
-        moddb.saveChatState(state)
+    state = moddb.chat_state(update.message.chat_id)
+    if moddb.enable_challenge_no_save(state):
+        moddb.save_chat_state(state)
         update.message.reply_text('Challenges are now enabled')
     else:
         update.message.reply_text('Challenges were already enabled')
 
 
 @with_connection
-def disableChallenge(update: Update, c: CallbackContext) -> None:
-    if not isUserAnAdmin(c, update.message.chat_id, update.message.from_user):
+def disable_challenge(update: Update, c: CallbackContext) -> None:
+    """Handler for disabling the challenge"""
+    if not is_user_an_admin(c, update.message.chat_id, update.message.from_user):
         logging.info("Update ignored %s", update)
         return
     logging.info("Disable Challenge issued %s", update)
-    state = moddb.chatState(update.message.chat_id)
-    if moddb.disableChallengeNoSave(state):
-        moddb.saveChatState(state)
+    state = moddb.chat_state(update.message.chat_id)
+    if moddb.disable_challenge_no_save(state):
+        moddb.save_chat_state(state)
         update.message.reply_text('Challenges are now disabled')
     else:
         update.message.reply_text('Challenges were already disabled')
 
 
 @with_connection
-def enableChannelPosts(update: Update, c: CallbackContext) -> None:
-    if not isUserAnAdmin(c, update.message.chat_id, update.message.from_user):
+def enable_channel_posts(update: Update, c: CallbackContext) -> None:
+    """Handler for enabling posts from channels"""
+    if not is_user_an_admin(c, update.message.chat_id, update.message.from_user):
         logging.info("Update ignored %s", update)
         return
     logging.info("Enable Channel posting issued %s", update)
-    state = moddb.chatState(update.message.chat_id)
-    if moddb.enableChannelPostingNoSave(state):
-        moddb.saveChatState(state)
+    state = moddb.chat_state(update.message.chat_id)
+    if moddb.enable_channel_posting_no_save(state):
+        moddb.save_chat_state(state)
         update.message.reply_text('Anonymous Channel Posting is now enabled')
     else:
         update.message.reply_text(
@@ -172,14 +180,15 @@ def enableChannelPosts(update: Update, c: CallbackContext) -> None:
 
 
 @with_connection
-def disableChannelPosts(update: Update, c: CallbackContext) -> None:
-    if not isUserAnAdmin(c, update.message.chat_id, update.message.from_user):
+def disable_channel_posts(update: Update, c: CallbackContext) -> None:
+    """Handler for disabling posts from channels"""
+    if not is_user_an_admin(c, update.message.chat_id, update.message.from_user):
         logging.info("Update ignored %s", update)
         return
     logging.info("Disable Channel posting issued %s", update)
-    state = moddb.chatState(update.message.chat_id)
-    if moddb.disableChannelPostingNoSave(state):
-        moddb.saveChatState(state)
+    state = moddb.chat_state(update.message.chat_id)
+    if moddb.disable_channel_posting_no_save(state):
+        moddb.save_chat_state(state)
         update.message.reply_text('Anonymous Channel Posting is now disabled')
     else:
         update.message.reply_text(
@@ -187,19 +196,20 @@ def disableChannelPosts(update: Update, c: CallbackContext) -> None:
 
 
 @with_connection
-def enableAutoBanChannelPosts(update: Update, c: CallbackContext) -> None:
-    if not isUserAnAdmin(c, update.message.chat_id, update.message.from_user):
+def enable_auto_ban_channel_posts(update: Update, c: CallbackContext) -> None:
+    """Handler for auto banning channel posts"""
+    if not is_user_an_admin(c, update.message.chat_id, update.message.from_user):
         logging.info("Update ignored %s", update)
         return
     logging.info("Enable Auto Ban Channel posting issued %s", update)
-    state = moddb.chatState(update.message.chat_id)
+    state = moddb.chat_state(update.message.chat_id)
 
-    if moddb.enableAutoBanChannelPostingNoSave(state):
+    if moddb.enable_auto_ban_channel_posting_no_save(state):
         also = None
         if not state.channel_post_disabled:
-            moddb.disableChannelPostingNoSave(state)
+            moddb.disable_channel_posting_no_save(state)
             also = "Also, Anonymous Channel Posting is now disabled"
-        moddb.saveChatState(state)
+        moddb.save_chat_state(state)
         update.message.reply_text('Anonymous Channel Posting which will ban the senders ability to post anonymously is now enabled')
         if also:
             update.message.reply_text(also)
@@ -209,22 +219,24 @@ def enableAutoBanChannelPosts(update: Update, c: CallbackContext) -> None:
 
 
 @with_connection
-def disableAutoBanChannelPosts(update: Update, c: CallbackContext) -> None:
-    if not isUserAnAdmin(c, update.message.chat_id, update.message.from_user):
+def disable_auto_ban_channel_posts(update: Update, c: CallbackContext) -> None:
+    """Handler for disabling auto ban of channel posts"""
+    if not is_user_an_admin(c, update.message.chat_id, update.message.from_user):
         logging.info("Update ignored %s", update)
         return
     logging.info("Disable Auto Ban Channel posting issued %s", update)
-    state = moddb.chatState(update.message.chat_id)
+    state = moddb.chat_state(update.message.chat_id)
 
-    if moddb.disableAutoBanChannelPostingNoSave(state):
-        moddb.saveChatState(state)
+    if moddb.disable_auto_ban_channel_posting_no_save(state):
+        moddb.save_chat_state(state)
         update.message.reply_text('Anonymous Channel Posting which will ban the senders ability to post anonymously is now disabled')
     else:
         update.message.reply_text(
             'Anonymous Channel Posting which will ban the senders ability to post anonymously was already disabled')
 
 @with_connection
-def help(update: Update, c: CallbackContext) -> None:
+def help_handler(update: Update, c: CallbackContext) -> None:
+    """Handler that gives help text"""
     logging.info("Help issued %s", update)
     # TODO handle start with contextual command thing from a group
     if update.message:
@@ -236,7 +248,7 @@ Hello, this bot can be added to groups to challenge newcomers in anti-bot ways, 
 You yourself may be facing a challenge right now. Good luck!
             ''')
         elif chat_type == CHAT_GROUP or chat_type == CHAT_SUPERGROUP:
-            if not isUserAnAdmin(c, update.message.chat_id, update.message.from_user):
+            if not is_user_an_admin(c, update.message.chat_id, update.message.from_user):
                 logging.info("Update ignored %s", update)
                 return
             update.message.reply_text('''
@@ -253,12 +265,13 @@ If you have any recommendations, reach out to @Cendyne
 
 
 @with_connection
-def chatMemberHandler(update: Update, c: CallbackContext) -> None:
+def chat_member_handler(update: Update, c: CallbackContext) -> None:
+    """New chat memebre handler"""
     logging.info("New Chat Member %s", update)
 
     if update.message and update.message.new_chat_members:
         chat_id = update.message.chat.id
-        state = moddb.chatState(chat_id)
+        state = moddb.chat_state(chat_id)
         if not state.challenge_enabled:
             return
         logging.info("Challeng enabled!")
@@ -278,14 +291,15 @@ def chatMemberHandler(update: Update, c: CallbackContext) -> None:
                                               [InlineKeyboardButton("Press this button to start", url="https://t.me/" + str(
                                                   c.bot.username) + "?start=" + str(chat_id))],
                                           ]))
-                moddb.challenge(chat_id, chat_member.id, randomChallenge(), time.time() + (state.challenge_expires_seconds or 86400), resp.message_id)
+                moddb.challenge(chat_id, chat_member.id, random_challenge(), time.time() + (state.challenge_expires_seconds or 86400), resp.message_id)
                 
             c.job_queue.run_once(callback, 0)
 
     return
 
 @with_connection
-def challengeCleared(c: CallbackContext, state: moddb.ChatState, user: User):
+def challenge_cleared(c: CallbackContext, state: moddb.ChatState, user: User):
+    """Challenge cleared by user, restore access to things"""
     message_id = moddb.find_challenge_message(state.challenge_chat_id, state.user_id)
     if message_id:
         try:
@@ -294,10 +308,16 @@ def challengeCleared(c: CallbackContext, state: moddb.ChatState, user: User):
             logging.error("Could not delete message")
             pass
     moddb.remove_challenge(state.challenge_chat_id, state.user_id)
+    # Set all values to True to undo restrictions
     c.bot.restrict_chat_member(state.challenge_chat_id, state.user_id, ChatPermissions(
         can_send_messages=True,
         can_send_media_messages=True,
-        can_send_other_messages=True
+        can_send_other_messages=True,
+        can_add_web_page_previews=True,
+        can_change_info=True,
+        can_invite_users=True,
+        can_pin_messages=True,
+        can_send_polls=True
     ))
     if state.challenge_message_id:
         try:
@@ -311,10 +331,11 @@ def challengeCleared(c: CallbackContext, state: moddb.ChatState, user: User):
         c.bot.send_message(state.challenge_chat_id, user.first_name + " passed the challenge")
     state.challenge_chat_id = None
     state.challenge_message_id = None
-    moddb.saveChatState(state)
+    moddb.save_chat_state(state)
 
 @with_connection
-def messageHandler(update: Update, c: CallbackContext) -> None:
+def message_handler(update: Update, c: CallbackContext) -> None:
+    """General message handler"""
     # print("Message handler!!!", update)
     logging.info("Incoming message %s", update)
 
@@ -342,11 +363,11 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
                     channel_post = True
 
             if chat_type == CHAT_GROUP or chat_type == CHAT_SUPERGROUP:
-                state = moddb.chatState(chat_id)
+                state = moddb.chat_state(chat_id)
                 changed = False
                 # logging.info("This is a group")
                 if official_post:
-                    changed = moddb.permitChannelPostsNoSave(state, sender_chat_id) or changed
+                    changed = moddb.permit_channel_posts_no_save(state, sender_chat_id) or changed
                 elif channel_post and state.channel_post_disabled:
                     if sender_chat_id in state.permitted_channel_posts:
                         # message.reply_text("This is an officially linked channel")
@@ -355,11 +376,11 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
                         if message.delete():
                             if sender_chat_id and state.auto_ban_sender_chats:
                                 if not c.bot.ban_chat_sender_chat(chat_id, sender_chat_id):
-                                    if not doIHaveRestrictPermissions(c, chat_id):
+                                    if not do_i_have_restrict_permissions(c, chat_id):
                                         message.reply_text(
                                             "I tried to ban a channel from posting here but I do not have permissions")
                         else:
-                            if not doIHaveDeletePermissions(c, chat_id):
+                            if not do_i_have_delete_permissions(c, chat_id):
                                 message.reply_text(
                                     "This is a channel post and I tried to delete it but I do not have permissions")
                             else:
@@ -368,18 +389,18 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
                         
                 if changed:
                     logging.info("Adjusting chat state: %s", state)
-                    moddb.saveChatState(state)
+                    moddb.save_chat_state(state)
             elif chat_type == CHAT_PRIVATE or chat_type == CHAT_SENDER:
-                state = moddb.chatStateWithUser(chat_id, from_user_id)
+                state = moddb.chat_state_with_user(chat_id, from_user_id)
                 logging.info("This is a private chat")
                 if state.challenge_message_id and state.challenge_chat_id:
-                    if moddb.isChallenged(state.challenge_chat_id, from_user_id):
+                    if moddb.is_challenged(state.challenge_chat_id, from_user_id):
                         challenge = moddb.find_challenge(state.challenge_chat_id, from_user_id)
                         if challenge:
                             logging.info("User is undergoing a challenge %s", challenge)
                             text = re.sub(r'[^a-zA-Z0-9]', '', message.text).upper()
                             if text == challenge:
-                                challengeCleared(c, state, message.from_user)
+                                challenge_cleared(c, state, message.from_user)
                                 message.reply_text("You got it!")
                             else:
                                 message.reply_text(secrets.choice(["Nope", "Not quite right", "Try again", "Oops", "Nope, try again"]))
@@ -387,18 +408,17 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
                             # State is inconsistent
                             state.challenge_chat_id = None
                             state.challenge_message_id = None
-                            moddb.saveChatState(state)  
+                            moddb.save_chat_state(state)  
                     else:
                         # State is inconsistent
                         state.challenge_chat_id = None
                         state.challenge_message_id = None
-                        moddb.saveChatState(state) 
+                        moddb.save_chat_state(state) 
                 else:
                     message.reply_text("Not sure why you're messaging me. Maybe try /help") 
             elif chat_type == CHAT_CHANNEL:
                 # Nothing is done here
                 pass
-        pass
     except Exception as ex:
         # print("A problem I guess")
         # traceback.print_exception(*sys.exc_info())
@@ -406,14 +426,15 @@ def messageHandler(update: Update, c: CallbackContext) -> None:
 
 with_connection
 def selftest(update: Update, c: CallbackContext) -> None:
+    """Self test handler"""
     try:
         if update.message:
             message = update.message
-            challenge = randomChallenge()
+            challenge = random_challenge()
             if message.text.startswith("/selftest "):
                 challenge = re.sub(r'[^a-zA-Z0-9]', '', message.text[10:]).upper().upper()
             chat_type = message.chat.type
-            if chat_type == CHAT_PRIVATE or (isUserAnAdmin(c, update.message.chat_id, update.message.from_user) and (chat_type == CHAT_GROUP or chat_type == CHAT_SUPERGROUP)):
+            if chat_type == CHAT_PRIVATE or (is_user_an_admin(c, update.message.chat_id, update.message.from_user) and (chat_type == CHAT_GROUP or chat_type == CHAT_SUPERGROUP)):
                 sticker = captcha.makeSticker(challenge)
                 if stickers.validSize(sticker):
                     try:
@@ -421,7 +442,6 @@ def selftest(update: Update, c: CallbackContext) -> None:
                     except:
                         message.reply_text("Couldn't do it")
                 stickers.deleteSticker(sticker)
-        pass
     except Exception as ex:
         # print("A problem I guess")
         traceback.print_exception(*sys.exc_info())
@@ -441,15 +461,15 @@ def inlinequery(update: Update, c: CallbackContext) -> None:
 
 @with_connection
 def callbackhandler(update: Update, c: CallbackContext) -> None:
-    """Handle the inline query."""
+    """Handle the button callback"""
     logging.info("Callback query %s", update)
     query = update.callback_query
 
     if query.message and query.message.chat:
         query.answer()
-        state = moddb.chatState(query.message.chat.id)
+        state = moddb.chat_state(query.message.chat.id)
         if state.challenge_chat_id:
-            if moddb.isChallenged(state.challenge_chat_id, state.user_id):
+            if moddb.is_challenged(state.challenge_chat_id, state.user_id):
                 challenge = moddb.find_challenge(state.challenge_chat_id, state.user_id)
                 sticker = captcha.makeSticker(challenge)
                 if stickers.validSize(sticker):
@@ -457,14 +477,14 @@ def callbackhandler(update: Update, c: CallbackContext) -> None:
                     try:
                         result = c.bot.send_document(chat_id=query.message.chat.id, document=open(sticker, "rb"))
                         state.challenge_message_id = result.message_id
-                        moddb.saveChatState(state)
+                        moddb.save_chat_state(state)
                         
                         if result.sticker and result.sticker.file_id:
                            sticker_file = result.sticker.file_id
                     except:
                         query.message.edit_reply_markup(reply_markup=None)
                         query.message.edit_text("I had an error so you get a free ride")
-                        challengeCleared(c, state, query.from_user)
+                        challenge_cleared(c, state, query.from_user)
                     # Save this sticker for later access
                     if log_chan and sticker_file:
                          c.bot.send_document(log_chan, sticker_file)
@@ -472,7 +492,7 @@ def callbackhandler(update: Update, c: CallbackContext) -> None:
                     # cry
                     query.message.edit_reply_markup(reply_markup=None)
                     query.message.edit_text("I had an error so you get a free ride")
-                    challengeCleared(c, state, query.from_user)
+                    challenge_cleared(c, state, query.from_user)
                 stickers.deleteSticker(sticker)
         else:
             query.answer("Expired Challenge. Try leaving and rejoining the group", show_alert=True)
@@ -485,13 +505,14 @@ def callbackhandler(update: Update, c: CallbackContext) -> None:
 @with_connection
 def cleanup(context: CallbackContext) -> None:
     """Handle cleanup of the database"""
-    job = context.job
+    # job = context.job
     # logging.info("Cleanup called %s", job)
     return
 
 
 @with_connection
 def test() -> None:
+    """Helper method to test the challenge functionality"""
     moddb.challenge(1, 2, "abc", time.time() + 1, 1)
     value = moddb.find_challenge(1, 2)
     logging.info("test: Found challenge? %s", value)
@@ -511,6 +532,7 @@ def test() -> None:
 
 
 def main() -> None:
+    """Main entrypoint"""
     moddb.init()
 
     # test()
@@ -537,24 +559,24 @@ def main() -> None:
 
     # Get the dispatcher to register handlers
     dispatcher = updater.dispatcher
-    job_queue = updater.job_queue
+    # job_queue = updater.job_queue
 
     # on different commands - answer in Telegram
     dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("enchallenge", enableChallenge))
-    dispatcher.add_handler(CommandHandler("dischallenge", disableChallenge))
-    dispatcher.add_handler(CommandHandler("enchannel", enableChannelPosts))
-    dispatcher.add_handler(CommandHandler("dischannel", disableChannelPosts))
-    dispatcher.add_handler(CommandHandler("enautobanchannel", enableAutoBanChannelPosts))
-    dispatcher.add_handler(CommandHandler("disautobanchannel", disableAutoBanChannelPosts))
+    dispatcher.add_handler(CommandHandler("enchallenge", enable_challenge))
+    dispatcher.add_handler(CommandHandler("dischallenge", disable_challenge))
+    dispatcher.add_handler(CommandHandler("enchannel", enable_channel_posts))
+    dispatcher.add_handler(CommandHandler("dischannel", disable_channel_posts))
+    dispatcher.add_handler(CommandHandler("enautobanchannel", enable_auto_ban_channel_posts))
+    dispatcher.add_handler(CommandHandler("disautobanchannel", disable_auto_ban_channel_posts))
     dispatcher.add_handler(CommandHandler("selftest", selftest))
-    dispatcher.add_handler(CommandHandler("help", help))
+    dispatcher.add_handler(CommandHandler("help", help_handler))
 
     # on non command i.e message - echo the message on Telegram
     dispatcher.add_handler(InlineQueryHandler(inlinequery))
     dispatcher.add_handler(MessageHandler(
-        Filters.status_update.new_chat_members, chatMemberHandler))
-    dispatcher.add_handler(MessageHandler(Filters.all, messageHandler))
+        Filters.status_update.new_chat_members, chat_member_handler))
+    dispatcher.add_handler(MessageHandler(Filters.all, message_handler))
     dispatcher.add_handler(CallbackQueryHandler(callbackhandler))
 
     # Start the Bot
