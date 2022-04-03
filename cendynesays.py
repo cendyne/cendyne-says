@@ -17,13 +17,21 @@ import stickers
 
 class CendyneSays:
     def __init__(self):
-        self.sticker = parse_svg_file(os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "assets/cendyne-says.svg"
-        )).layers[0]
-
-        self.sticker.transform.position.value.x = 85
-        self.sticker.transform.position.value.y = 90
+        
+        if os.getenv("USE_GLEAM") is not None:
+            self.sticker = parse_svg_file(os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "assets/gleamburp.svg"
+            )).layers[0]
+            self.sticker.transform.position.value.x = 280
+            self.sticker.transform.position.value.y = 190
+        else:
+            self.sticker = parse_svg_file(os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "assets/cendyne-says.svg"
+            )).layers[0]
+            self.sticker.transform.position.value.x = 85
+            self.sticker.transform.position.value.y = 90
 
     def splitWords(self, text, num):
         words = text.split(" ")
@@ -134,8 +142,12 @@ class CendyneSays:
 
         textboxLayer = an.add_layer(objects.ShapeLayer())
         logging.info("Bounding box for text %s", textbb)
-        textboxLayer.add_shape(shapes.TextBox(Point(
-            textbb.x1 - 20, textbb.y1), textbb.size() + Point(60, 20), 40, Point(550, 400)))
+        if os.getenv("USE_GLEAM") is not None:
+            textboxLayer.add_shape(shapes.TextBox(Point(
+                textbb.x1 - 20, textbb.y1), textbb.size() + Point(60, 20), 40, Point(550, 350)))
+        else:
+            textboxLayer.add_shape(shapes.TextBox(Point(
+                textbb.x1 - 20, textbb.y1), textbb.size() + Point(60, 20), 40, Point(550, 400)))
         fill = textboxLayer.add_shape(objects.Fill(Color(1, 1, 1)))
         stroke = textboxLayer.add_shape(objects.Stroke(Color(0, 0, 0), 10))
 

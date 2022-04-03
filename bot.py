@@ -77,6 +77,8 @@ def makeSticker(text):
                             "Count %d result in too large of a file", count)
                         continue
                     break
+            elif os.getenv("USE_GLEAM") is not None:
+                sticker = say.makeSticker(text)
             else:
                 act = None
                 if elements[le - 1] == "!":
