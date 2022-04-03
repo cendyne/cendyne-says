@@ -28,6 +28,11 @@ breathes = CendyneBreathes()
 
 
 token = os.environ["BOT_TOKEN"]
+if os.getenv("USE_GLEAM") is not None:
+    if os.getenv("GLEAM_TOKEN") is not None:
+        token = os.environ["GLEAM_TOKEN"]
+    else:
+        print("GLEAM_TOKEN expected..")
 log_chan = int(os.getenv("LOG_CHAN"))
 
 
@@ -228,6 +233,9 @@ def main() -> None:
     dispatcher.add_handler(InlineQueryHandler(inlinequery))
     dispatcher.add_handler(ChatMemberHandler(messageHandler))
     dispatcher.add_handler(MessageHandler(Filters.text, messageHandler))
+
+    me = updater.bot.get_me()
+    print("Bot: ", me)
 
     # Start the Bot
     updater.start_polling()

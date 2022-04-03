@@ -15,7 +15,13 @@ localthreaddb = ThreadDb()
 
 
 def create_connection() -> sqlite3.Connection:
-    return sqlite3.connect(os.getenv("DB"))
+    db = os.getenv("DB")
+    if os.getenv("USE_GLEAM") is not None:
+        if os.getenv("GLEAM_DB") is not None:
+            db = os.environ["GLEAM_DB"]
+        else:
+            print("GLEAM_DB expected..")
+    return sqlite3.connect(db)
 
 
 def with_connection(func):
